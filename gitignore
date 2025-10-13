@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.expo/
+dist/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Production builds
+android/app/build/
+android/build/
+ios/build/
+
+# Environment variables
+.env
+.env.local
+
+# EAS
+.eas/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Metro
+*.metro.config.js.timestamp*
+
+# Logs
+*.log
