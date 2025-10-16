@@ -8,7 +8,7 @@ export const LocationProvider = ({ children }) => {
   const [location, setLocation] = useState(null);
 
   const getCurrentLocation = async () => {
-    // Simulation de localisation (Paris)
+    // Simulation de localisation (Paris par défaut)
     const mockLocation = {
       coords: {
         latitude: 48.8566,
