@@ -1,3 +1,5 @@
+import API from './api';
+
 // Version simulée pour le développement avec tokens persistants
 let mockUsers = [];
 let mockAlerts = [];
@@ -5,26 +7,22 @@ let mockAlerts = [];
 export const authService = {
   login: (email, password) => {
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (email && password) {
-          // Créer ou récupérer l'utilisateur
-          let user = mockUsers.find(u => u.email === email);
-          if (!user) {
-            user = {
-              _id: Date.now().toString(),
-              email: email,
-              name: email.includes('doctor') ? 'Dr. Test' : 'Donneur Test',
-              role: email.includes('doctor') ? 'doctor' : 'donor',
-              bloodType: email.includes('doctor') ? null : 'A+',
-              hospital: email.includes('doctor') ? 'Hôpital Central' : null,
-              createdAt: new Date()
-            };
-            mockUsers.push(user);
+      if(email && password) {
+        try {
+          const response = API.post('/auth/login', { email, password });
+          user = {
+            _id: Date.now().toString(),
+            email: response.data.email,
+            name: response.data.name,
+            role: response.data.role,
+            bloodType: response.data.bloodType || null,
+            hospital: response.data.hospital || null,
+            createdAt: new Date()
           }
+          mockUsers.push(user);
 
-          // Token valide 24 heures
-          const token = `mock-jwt-token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          
+          const token = response.token;
+
           resolve({
             data: {
               status: 'success',
@@ -34,83 +32,99 @@ export const authService = {
               }
             }
           });
-        } else {
-          reject(new Error('Email et mot de passe requis'));
+        } catch(error) {
+          reject(new Error('Une erreur est survenue lors de la connexion'));
         }
-      }, 1000);
-    });
+      } else {
+        reject(new Error('Email et mot de passe requis'));
+      }
+    })
   },
 
   register: (userData) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (userData.email && userData.password) {
-          const user = {
-            _id: Date.now().toString(),
-            email: userData.email,
-            name: userData.name || (userData.role === 'doctor' ? 'Dr. ' + userData.email.split('@')[0] : userData.email.split('@')[0]),
-            role: userData.role,
-            bloodType: userData.bloodType || null,
-            hospital: userData.hospital || null,
-            phone: userData.phone || null,
-            createdAt: new Date()
-          };
-          
-          mockUsers.push(user);
+  return new Promise((resolve, reject) => {
+    if (userData.email && userData.password) {
+      try {
+        const response = API.post('/auth/register', userData);
 
-          const token = `mock-jwt-token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          
-          resolve({
+        const user = {
+          _id: Date.now().toString(),
+          email: userData.email,
+          name: response.data.name || (userData.role === 'doctor' 
+              ? 'Dr. ' + userData.email.split('@')[0] 
+              : userData.email.split('@')[0]),
+          role: response.data.role || userData.role,
+          bloodType: response.data.bloodType || userData.bloodType || null,
+          hospital: response.data.hospital || userData.hospital || null,
+          phone: response.data.phone || userData.phone || null,
+          createdAt: new Date()
+        };
+
+        mockUsers.push(user);
+
+        const token = response.token;
+
+        resolve({
+          data: {
+            status: 'success',
+            token: token,
             data: {
-              status: 'success',
-              token: token,
-              data: {
-                user: user
-              }
+              user: user
             }
-          });
-        } else {
-          reject(new Error('Données manquantes'));
-        }
-      }, 1000);
-    });
+          }
+        });
+      } catch (error) {
+        reject(new Error("Une erreur est survenue lors de l'inscription"));
+      }
+    } else {
+      reject(new Error("Email et mot de passe requis"));
+    }
+  });
+},
+
+
+  getProfile: async () => {
+    try {
+      const response = await API.get('/auth/profile'); 
+      return response;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  getProfile: () => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Simuler la récupération du profil depuis le token
-        // En réalité, cela vérifierait le token côté backend
-        const user = mockUsers[0]; // Premier utilisateur créé
-        if (user) {
-          resolve({
-            data: {
-              status: 'success',
-              data: {
-                user: user
-              }
-            }
-          });
-        } else {
-          reject(new Error('Utilisateur non trouvé'));
-        }
-      }, 500);
-    });
+  updateProfile: async (profileData) => {
+    try {
+      const response = await API.put('/auth/profile', profileData);
+      return response;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  updateProfile: (profileData) => {
-    return Promise.resolve({ data: { status: 'success' } });
+  updateLocation: async (locationData) => {
+    try {
+      const response = await API.post('/auth/location', locationData);
+      return response;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  updateLocation: (locationData) => {
-    return Promise.resolve({ data: { status: 'success' } });
+  updateFCMToken: async (fcmToken) => {
+    try {
+      const response = await API.post('/auth/fcm-token', { fcmToken });
+      return response;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  updateFCMToken: (fcmToken) => {
-    return Promise.resolve({ data: { status: 'success' } });
-  },
-
-  logout: () => {
-    return Promise.resolve();
+  logout: async () => {
+    try {
+      const response = await API.post('/auth/logout');
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 };
