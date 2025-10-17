@@ -242,8 +242,6 @@ export default function DoctorDashboard({ navigation }) {
 }
 
 
-// Ajouter cet import manquant
-const { TextInput } = require('react-native-paper');
 
 const styles = StyleSheet.create({
   container: {

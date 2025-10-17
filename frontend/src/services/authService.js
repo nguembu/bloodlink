@@ -1,130 +1,96 @@
 import API from './api';
 
-// Version simulée pour le développement avec tokens persistants
 let mockUsers = [];
 let mockAlerts = [];
 
 export const authService = {
-  login: (email, password) => {
-    return new Promise((resolve, reject) => {
-      if(email && password) {
-        try {
-          const response = API.post('/auth/login', { email, password });
-          user = {
-            _id: Date.now().toString(),
-            email: response.data.email,
-            name: response.data.name,
-            role: response.data.role,
-            bloodType: response.data.bloodType || null,
-            hospital: response.data.hospital || null,
-            createdAt: new Date()
-          }
-          mockUsers.push(user);
+  login: async (email, password) => {
+    if (!email || !password) {
+      throw new Error("Email et mot de passe requis");
+    }
 
-          const token = response.token;
+    try {
+      const response = await API.post('/auth/login', { email, password });
+      console.log('✅ Login API response:', response.data);
 
-          resolve({
-            data: {
-              status: 'success',
-              token: token,
-              data: {
-                user: user
-              }
-            }
-          });
-        } catch(error) {
-          reject(new Error('Une erreur est survenue lors de la connexion'));
-        }
-      } else {
-        reject(new Error('Email et mot de passe requis'));
-      }
-    })
+      // Ici je récupère directement le user et le token depuis l’API
+      const token = response?.data?.token;
+      const user = response?.data?.data?.user;
+
+      // (optionnel) je garde un historique côté front
+      mockUsers.push({
+        ...user,
+        _id: user?._id || Date.now().toString(),
+        createdAt: user?.createdAt || new Date()
+      });
+      console.log('📝 Mock Users History:', {user, token});
+
+      return {
+        status: 'success',
+        token,
+        user
+      };
+    } catch (error) {
+      console.log('❌ Login error:', error);
+      throw new Error(error.response?.data?.message || "Une erreur est survenue lors de la connexion");
+    }
   },
 
-  register: (userData) => {
-  return new Promise((resolve, reject) => {
-    if (userData.email && userData.password) {
-      try {
-        const response = API.post('/auth/register', userData);
-
-        const user = {
-          _id: Date.now().toString(),
-          email: userData.email,
-          name: response.data.name || (userData.role === 'doctor' 
-              ? 'Dr. ' + userData.email.split('@')[0] 
-              : userData.email.split('@')[0]),
-          role: response.data.role || userData.role,
-          bloodType: response.data.bloodType || userData.bloodType || null,
-          hospital: response.data.hospital || userData.hospital || null,
-          phone: response.data.phone || userData.phone || null,
-          createdAt: new Date()
-        };
-
-        mockUsers.push(user);
-
-        const token = response.token;
-
-        resolve({
-          data: {
-            status: 'success',
-            token: token,
-            data: {
-              user: user
-            }
-          }
-        });
-      } catch (error) {
-        reject(new Error("Une erreur est survenue lors de l'inscription"));
-      }
-    } else {
-      reject(new Error("Email et mot de passe requis"));
+  register: async (userData) => {
+    if (!userData.email || !userData.password) {
+      throw new Error("Email et mot de passe requis");
     }
-  });
-},
 
+    try {
+      const response = await API.post('/auth/register', userData);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Une erreur est survenue lors de l'inscription");
+    }
+  },
 
   getProfile: async () => {
     try {
-      const response = await API.get('/auth/profile'); 
-      return response;
+      const response = await API.get('/auth/profile');
+      return response.data;
     } catch (error) {
-      throw error;
+      throw new Error(error.response?.data?.message || "Impossible de récupérer le profil");
     }
   },
 
   updateProfile: async (profileData) => {
     try {
       const response = await API.put('/auth/profile', profileData);
-      return response;
+      return response.data;
     } catch (error) {
-      throw error;
+      throw new Error(error.response?.data?.message || "Impossible de mettre à jour le profil");
     }
   },
 
   updateLocation: async (locationData) => {
     try {
       const response = await API.post('/auth/location', locationData);
-      return response;
+      return response.data;
     } catch (error) {
-      throw error;
+      throw new Error(error.response?.data?.message || "Impossible de mettre à jour la localisation");
     }
   },
 
   updateFCMToken: async (fcmToken) => {
     try {
       const response = await API.post('/auth/fcm-token', { fcmToken });
-      return response;
+      return response.data;
     } catch (error) {
-      throw error;
+      throw new Error(error.response?.data?.message || "Impossible de mettre à jour le token FCM");
     }
   },
 
   logout: async () => {
     try {
       const response = await API.post('/auth/logout');
-      return response;
+      return response.data;
     } catch (error) {
-      throw error;
+      throw new Error(error.response?.data?.message || "Impossible de se déconnecter");
     }
   }
 };

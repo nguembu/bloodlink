@@ -72,8 +72,8 @@ export default function DonorDashboard({ navigation }) {
         alert('Réponse enregistrée. Merci pour votre honnêteté.');
       }
     } catch (error) {
-      console.error('❌ Error responding to alert:', error.response?.data || error.message);
-      alert('Erreur lors de l\'envoi de votre réponse');
+      console.error('❌ Error responding to alert:', error?.message || 'Erreur lors de l\'envoi de votre réponse');
+      alert(error?.message || 'Erreur lors de l\'envoi de votre réponse');
     }
   };
 
