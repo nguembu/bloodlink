@@ -1,71 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="9" failures="8" errors="0" time="21.035">
-  <testsuite name="E2E Doctor Workflow" errors="0" failures="4" skipped="0" timestamp="2025-10-17T11:21:06" time="8.762" tests="4">
-    <testcase classname="E2E Doctor Workflow Doctor creates an alert" name="E2E Doctor Workflow Doctor creates an alert" time="0.107">
-      <failure>Error: expect(received).toBe(expected) // Object.is equality
-
-Expected: 201
-Received: 400
-    at Object.toBe (/home/ronel/Documents/M1/INF4077/bloodlink/backend/tests/e2e/doctor.e2e.test.js:71:28)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+<testsuites name="jest tests" tests="4" failures="0" errors="0" time="13.443">
+  <testsuite name="Donor API" errors="0" failures="0" skipped="0" timestamp="2025-10-17T11:25:09" time="13.253" tests="4">
+    <testcase classname="Donor API GET /api/donors/nearby-alerts - should return nearby alerts" name="Donor API GET /api/donors/nearby-alerts - should return nearby alerts" time="1.842">
     </testcase>
-    <testcase classname="E2E Doctor Workflow Doctor fetches their own alerts" name="E2E Doctor Workflow Doctor fetches their own alerts" time="0.015">
-      <failure>ValidationError: Alert validation failed: hospital: Hospital name is required
-    at model.Document.invalidate (/home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/document.js:3219:32)
-    at /home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/document.js:3012:17
-    at /home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/schematype.js:1368:9
-    at processTicksAndRejections (node:internal/process/task_queues:77:11)</failure>
+    <testcase classname="Donor API GET /api/donors/donation-history - should return empty donation history" name="Donor API GET /api/donors/donation-history - should return empty donation history" time="1.517">
     </testcase>
-    <testcase classname="E2E Doctor Workflow Doctor cancels an alert" name="E2E Doctor Workflow Doctor cancels an alert" time="0.011">
-      <failure>ValidationError: Alert validation failed: hospital: Hospital name is required
-    at model.Document.invalidate (/home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/document.js:3219:32)
-    at /home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/document.js:3012:17
-    at /home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/schematype.js:1368:9
-    at processTicksAndRejections (node:internal/process/task_queues:77:11)</failure>
+    <testcase classname="Donor API GET /api/donors/stats - should return donor statistics" name="Donor API GET /api/donors/stats - should return donor statistics" time="1.081">
     </testcase>
-    <testcase classname="E2E Doctor Workflow Doctor views alert responses from donors" name="E2E Doctor Workflow Doctor views alert responses from donors" time="0.017">
-      <failure>ValidationError: Alert validation failed: hospital: Hospital name is required
-    at model.Document.invalidate (/home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/document.js:3219:32)
-    at /home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/document.js:3012:17
-    at /home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/schematype.js:1368:9
-    at processTicksAndRejections (node:internal/process/task_queues:77:11)</failure>
-    </testcase>
-  </testsuite>
-  <testsuite name="E2E BloodLink Workflow" errors="0" failures="3" skipped="0" timestamp="2025-10-17T11:21:15" time="6.46" tests="4">
-    <testcase classname="E2E BloodLink Workflow Doctor creates alert, donor responds, notification sent" name="E2E BloodLink Workflow Doctor creates alert, donor responds, notification sent" time="0.319">
-      <failure>Error: expect(received).toBe(expected) // Object.is equality
-
-Expected: 201
-Received: 400
-    at Object.toBe (/home/ronel/Documents/M1/INF4077/bloodlink/backend/tests/e2e/donor.e2e.test.js:70:33)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="E2E BloodLink Workflow Donor updates FCM token" name="E2E BloodLink Workflow Donor updates FCM token" time="0.229">
-      <failure>Error: expect(received).toBe(expected) // Object.is equality
-
-Expected: 200
-Received: 404
-    at Object.toBe (/home/ronel/Documents/M1/INF4077/bloodlink/backend/tests/e2e/donor.e2e.test.js:100:28)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
-    </testcase>
-    <testcase classname="E2E BloodLink Workflow Donor retrieves donation history" name="E2E BloodLink Workflow Donor retrieves donation history" time="0.094">
-      <failure>ValidationError: Alert validation failed: hospital: Hospital name is required, doctor: Doctor reference is required
-    at model.Document.invalidate (/home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/document.js:3219:32)
-    at /home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/document.js:3012:17
-    at /home/ronel/Documents/M1/INF4077/bloodlink/backend/node_modules/mongoose/lib/schematype.js:1368:9
-    at processTicksAndRejections (node:internal/process/task_queues:77:11)</failure>
-    </testcase>
-    <testcase classname="E2E BloodLink Workflow Donor retrieves stats" name="E2E BloodLink Workflow Donor retrieves stats" time="0.073">
-    </testcase>
-  </testsuite>
-  <testsuite name="End-to-End Test: BloodLink Workflow" errors="0" failures="1" skipped="0" timestamp="2025-10-17T11:21:21" time="5.676" tests="1">
-    <testcase classname="End-to-End Test: BloodLink Workflow Full flow: Doctor creates alert -&gt; Donor responds -&gt; Notification sent" name="End-to-End Test: BloodLink Workflow Full flow: Doctor creates alert -&gt; Donor responds -&gt; Notification sent" time="0.188">
-      <failure>Error: expect(received).toBe(expected) // Object.is equality
-
-Expected: 201
-Received: 400
-    at Object.toBe (/home/ronel/Documents/M1/INF4077/bloodlink/backend/tests/e2e/bloodlink.e2e.test.js:70:33)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    <testcase classname="Donor API POST /api/donors/alert/:alertId/respond - should fail with invalid alertId" name="Donor API POST /api/donors/alert/:alertId/respond - should fail with invalid alertId" time="1.196">
     </testcase>
   </testsuite>
 </testsuites>
