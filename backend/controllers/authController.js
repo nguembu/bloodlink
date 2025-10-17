@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 exports.register = async (req, res) => {
   try {
     const { email, password, role, name, bloodType, hospital, phone } = req.body;
+    console.log('Registration data:', { email, role, name, bloodType, hospital, phone });
 
     // Vérifier si l'utilisateur existe déjà
     const existingUser = await User.findOne({ email });
@@ -88,8 +89,9 @@ exports.login = async (req, res) => {
 
     // Ne pas renvoyer le mot de passe
     user.password = undefined;
+    console.log('User logged in:', user);
 
-    res.json({
+    res.status(201).json({
       status: 'success',
       message: 'Connexion réussie',
       token,
