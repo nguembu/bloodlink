@@ -1,116 +1,96 @@
-// Version simulée pour le développement avec tokens persistants
+import API from './api';
+
 let mockUsers = [];
 let mockAlerts = [];
 
 export const authService = {
-  login: (email, password) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (email && password) {
-          // Créer ou récupérer l'utilisateur
-          let user = mockUsers.find(u => u.email === email);
-          if (!user) {
-            user = {
-              _id: Date.now().toString(),
-              email: email,
-              name: email.includes('doctor') ? 'Dr. Test' : 'Donneur Test',
-              role: email.includes('doctor') ? 'doctor' : 'donor',
-              bloodType: email.includes('doctor') ? null : 'A+',
-              hospital: email.includes('doctor') ? 'Hôpital Central' : null,
-              createdAt: new Date()
-            };
-            mockUsers.push(user);
-          }
+  login: async (email, password) => {
+    if (!email || !password) {
+      throw new Error("Email et mot de passe requis");
+    }
 
-          // Token valide 24 heures
-          const token = `mock-jwt-token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          
-          resolve({
-            data: {
-              status: 'success',
-              token: token,
-              data: {
-                user: user
-              }
-            }
-          });
-        } else {
-          reject(new Error('Email et mot de passe requis'));
-        }
-      }, 1000);
-    });
+    try {
+      const response = await API.post('/auth/login', { email, password });
+      console.log('✅ Login API response:', response.data);
+
+      // Ici je récupère directement le user et le token depuis l’API
+      const token = response?.data?.token;
+      const user = response?.data?.data?.user;
+
+      // (optionnel) je garde un historique côté front
+      mockUsers.push({
+        ...user,
+        _id: user?._id || Date.now().toString(),
+        createdAt: user?.createdAt || new Date()
+      });
+      console.log('📝 Mock Users History:', {user, token});
+
+      return {
+        status: 'success',
+        token,
+        user
+      };
+    } catch (error) {
+      console.log('❌ Login error:', error);
+      throw new Error(error.response?.data?.message || "Une erreur est survenue lors de la connexion");
+    }
   },
 
-  register: (userData) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (userData.email && userData.password) {
-          const user = {
-            _id: Date.now().toString(),
-            email: userData.email,
-            name: userData.name || (userData.role === 'doctor' ? 'Dr. ' + userData.email.split('@')[0] : userData.email.split('@')[0]),
-            role: userData.role,
-            bloodType: userData.bloodType || null,
-            hospital: userData.hospital || null,
-            phone: userData.phone || null,
-            createdAt: new Date()
-          };
-          
-          mockUsers.push(user);
+  register: async (userData) => {
+    if (!userData.email || !userData.password) {
+      throw new Error("Email et mot de passe requis");
+    }
 
-          const token = `mock-jwt-token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          
-          resolve({
-            data: {
-              status: 'success',
-              token: token,
-              data: {
-                user: user
-              }
-            }
-          });
-        } else {
-          reject(new Error('Données manquantes'));
-        }
-      }, 1000);
-    });
+    try {
+      const response = await API.post('/auth/register', userData);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Une erreur est survenue lors de l'inscription");
+    }
   },
 
-  getProfile: () => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Simuler la récupération du profil depuis le token
-        // En réalité, cela vérifierait le token côté backend
-        const user = mockUsers[0]; // Premier utilisateur créé
-        if (user) {
-          resolve({
-            data: {
-              status: 'success',
-              data: {
-                user: user
-              }
-            }
-          });
-        } else {
-          reject(new Error('Utilisateur non trouvé'));
-        }
-      }, 500);
-    });
+  getProfile: async () => {
+    try {
+      const response = await API.get('/auth/profile');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Impossible de récupérer le profil");
+    }
   },
 
-  updateProfile: (profileData) => {
-    return Promise.resolve({ data: { status: 'success' } });
+  updateProfile: async (profileData) => {
+    try {
+      const response = await API.put('/auth/profile', profileData);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Impossible de mettre à jour le profil");
+    }
   },
 
-  updateLocation: (locationData) => {
-    return Promise.resolve({ data: { status: 'success' } });
+  updateLocation: async (locationData) => {
+    try {
+      const response = await API.post('/auth/location', locationData);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Impossible de mettre à jour la localisation");
+    }
   },
 
-  updateFCMToken: (fcmToken) => {
-    return Promise.resolve({ data: { status: 'success' } });
+  updateFCMToken: async (fcmToken) => {
+    try {
+      const response = await API.post('/auth/fcm-token', { fcmToken });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Impossible de mettre à jour le token FCM");
+    }
   },
 
-  logout: () => {
-    return Promise.resolve();
+  logout: async () => {
+    try {
+      const response = await API.post('/auth/logout');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Impossible de se déconnecter");
+    }
   }
 };

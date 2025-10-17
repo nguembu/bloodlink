@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Image, Dimensions, ScrollView } from 'react-native';
+import { View, StyleSheet, Image, Dimensions, ScrollView,TouchableOpacity } from 'react-native';
 import { Button, Text, Card, useTheme } from 'react-native-paper';
 
 const { width } = Dimensions.get('window');

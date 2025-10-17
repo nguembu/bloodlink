@@ -29,22 +29,22 @@ const validateRegistration = [
     .isIn(['doctor', 'donor'])
     .withMessage('Le rôle doit être "doctor" ou "donor"'),
   
-  body('name')
-    .if(body('role').equals('donor'))
-    .notEmpty()
-    .withMessage('Le nom est requis pour les donneurs')
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Le nom doit contenir entre 2 et 50 caractères'),
+  // body('name')
+  //   .if(body('role').equals('donor'))
+  //   .notEmpty()
+  //   .withMessage('Le nom est requis pour les donneurs')
+  //   .isLength({ min: 2, max: 50 })
+  //   .withMessage('Le nom doit contenir entre 2 et 50 caractères'),
   
   body('bloodType')
     .if(body('role').equals('donor'))
     .isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])
     .withMessage('Type sanguin invalide'),
   
-  body('hospital')
-    .if(body('role').equals('doctor'))
-    .notEmpty()
-    .withMessage('Le nom de l\'hôpital est requis pour les médecins'),
+  // body('hospital')
+  //   .if(body('role').equals('doctor'))
+  //   .notEmpty()
+  //   .withMessage('Le nom de l\'hôpital est requis pour les médecins'),
   
   handleValidationErrors
 ];

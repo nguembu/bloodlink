@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Linking } from 'react-native';
-import { Card, Title, Button, Text, Chip, ActivityIndicator, Divider } from 'react-native-paper';
+import { Card, Title, Button, Text, Chip, ActivityIndicator } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import { alertService } from '../services/alertService';
@@ -28,67 +28,59 @@ export default function DonorDashboard({ navigation }) {
         setAlerts(response.data.data.alerts || []);
       }
     } catch (error) {
-      console.error('Error loading alerts:', error);
-      // Simulation pour le développement
-      setAlerts([
-        {
-          _id: '1',
-          bloodType: 'A+',
-          urgency: 'high',
-          hospital: 'Hôpital Central',
-          distance: 2.5,
-          createdAt: new Date().toISOString(),
-          doctor: { name: 'Dr. Martin', hospital: 'Hôpital Central' },
-          hasResponded: false
-        },
-        {
-          _id: '2',
-          bloodType: 'O-',
-          urgency: 'critical',
-          hospital: 'Clinique Saint-Louis',
-          distance: 1.2,
-          createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          doctor: { name: 'Dr. Leroy', hospital: 'Clinique Saint-Louis' },
-          hasResponded: true,
-          myResponse: { status: 'accepted' }
-        }
-      ]);
+      console.error('❌ Error loading alerts:', error.response?.data || error.message);
+      setAlerts([]); // pas de simulation → juste vider la liste
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const response = await alertService.getDonorStats();
+      setStats(response.data.data || {
+        totalDonations: 0,
+        activeAlerts: 0,
+        responseRate: 0
+      });
+    } catch (error) {
+      console.error('❌ Error loading stats:', error.response?.data || error.message);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     loadAlerts();
+    loadStats();
   };
 
   useEffect(() => {
     loadAlerts();
+    loadStats();
   }, [location]);
 
   const respondToAlert = async (alertId, status) => {
     try {
       await alertService.respondToAlert(alertId, { status });
-      loadAlerts();
-      
+      await loadAlerts();
+      await loadStats();
+
       if (status === 'accepted') {
         alert('Merci ! Vous avez accepté de donner votre sang. Rendez-vous à l\'hôpital indiqué.');
       } else {
         alert('Réponse enregistrée. Merci pour votre honnêteté.');
       }
     } catch (error) {
-      console.error('Error responding to alert:', error);
-      alert('Réponse enregistrée (simulation)');
-      loadAlerts();
+      console.error('❌ Error responding to alert:', error?.message || 'Erreur lors de l\'envoi de votre réponse');
+      alert(error?.message || 'Erreur lors de l\'envoi de votre réponse');
     }
   };
 
   const openMaps = (hospital) => {
     const query = encodeURIComponent(hospital);
     const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-    Linking.openURL(url).catch(err => {
+    Linking.openURL(url).catch(() => {
       alert('Impossible d\'ouvrir l\'application de cartes');
     });
   };
@@ -179,8 +171,8 @@ export default function DonorDashboard({ navigation }) {
                 <Text style={styles.statLabel}>Dons effectués</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{alerts.length}</Text>
-                <Text style={styles.statLabel}>Alertes près de vous</Text>
+                <Text style={styles.statNumber}>{stats.activeAlerts}</Text>
+                <Text style={styles.statLabel}>Alertes actives</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>{stats.responseRate}%</Text>
@@ -331,207 +323,48 @@ export default function DonorDashboard({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  headerCard: {
-    margin: 16,
-    borderRadius: 12,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  welcomeTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1f2937',
-  },
-  bloodTypeBadge: {
-    backgroundColor: '#dbeafe',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
-  bloodTypeText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2563eb',
-  },
-  logoutButton: {
-    borderColor: '#2563eb',
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  locationButton: {
-    marginTop: 8,
-  },
-  statsCard: {
-    margin: 16,
-    marginTop: 0,
-    borderRadius: 12,
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#2563eb',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  alertsCard: {
-    margin: 16,
-    marginTop: 0,
-    borderRadius: 12,
-  },
-  alertsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  alertsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  loader: {
-    marginVertical: 20,
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyStateIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  enableLocationButton: {
-    backgroundColor: '#2563eb',
-  },
-  alertItem: {
-    marginBottom: 12,
-    borderRadius: 8,
-  },
-  alertHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  alertBloodType: {
-    backgroundColor: '#fef2f2',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  urgencyChip: {
-    height: 28,
-  },
-  alertHospital: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 2,
-  },
-  alertDoctor: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  alertDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  alertDistance: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  alertTime: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  responseStatus: {
-    alignItems: 'center',
-  },
-  responseText: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  acceptedText: {
-    color: '#059669',
-  },
-  declinedText: {
-    color: '#dc2626',
-  },
-  directionsButton: {
-    backgroundColor: '#2563eb',
-    width: '100%',
-  },
-  responseActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  declineButton: {
-    flex: 1,
-    borderColor: '#d1d5db',
-  },
-  acceptButton: {
-    flex: 2,
-    backgroundColor: '#2563eb',
-  },
-  infoCard: {
-    margin: 16,
-    marginTop: 0,
-    borderRadius: 12,
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#4b5563',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  headerCard: { margin: 16, borderRadius: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  welcomeTitle: { fontSize: 20, fontWeight: '700', color: '#1f2937' },
+  bloodTypeBadge: { backgroundColor: '#dbeafe', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6, marginTop: 8, alignSelf: 'flex-start' },
+  bloodTypeText: { fontSize: 14, fontWeight: '700', color: '#2563eb' },
+  logoutButton: { borderColor: '#2563eb' },
+  locationText: { fontSize: 14, color: '#6b7280', marginTop: 4 },
+  locationButton: { marginTop: 8 },
+  statsCard: { margin: 16, marginTop: 0, borderRadius: 12 },
+  statsTitle: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
+  statsContainer: { flexDirection: 'row', justifyContent: 'space-around' },
+  statItem: { alignItems: 'center' },
+  statNumber: { fontSize: 24, fontWeight: '700', color: '#2563eb' },
+  statLabel: { fontSize: 12, color: '#6b7280', marginTop: 4, textAlign: 'center' },
+  alertsCard: { margin: 16, marginTop: 0, borderRadius: 12 },
+  alertsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  alertsTitle: { fontSize: 18, fontWeight: '600' },
+  loader: { marginVertical: 20 },
+  emptyState: { alignItems: 'center', padding: 40 },
+  emptyStateIcon: { fontSize: 48, marginBottom: 16 },
+  emptyStateTitle: { fontSize: 18, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  emptyStateText: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  enableLocationButton: { backgroundColor: '#2563eb' },
+  alertItem: { marginBottom: 12, borderRadius: 8 },
+  alertHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  alertBloodType: { backgroundColor: '#fef2f2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  urgencyChip: { height: 28 },
+  alertHospital: { fontSize: 16, fontWeight: '600', color: '#1f2937', marginBottom: 2 },
+  alertDoctor: { fontSize: 14, color: '#6b7280', marginBottom: 8 },
+  alertDetails: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  alertDistance: { fontSize: 12, color: '#6b7280' },
+  alertTime: { fontSize: 12, color: '#6b7280' },
+  responseStatus: { alignItems: 'center' },
+  responseText: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  acceptedText: { color: '#059669' },
+  declinedText: { color: '#dc2626' },
+  directionsButton: { backgroundColor: '#2563eb', width: '100%' },
+  responseActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  declineButton: { flex: 1, borderColor: '#d1d5db' },
+  acceptButton: { flex: 2, backgroundColor: '#2563eb' },
+  infoCard: { margin: 16, marginTop: 0, borderRadius: 12 },
+  infoTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
+  infoText: { fontSize: 14, color: '#4b5563', marginBottom: 8, lineHeight: 20 },
 });

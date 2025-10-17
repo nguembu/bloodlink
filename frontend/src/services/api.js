@@ -4,12 +4,12 @@ import { Alert } from 'react-native';
 
 // Configuration de base d'axios
 const getBaseURL = () => {
-  return 'http://192.168.254.155:5000/api'; // Votre IP locale
+  return 'http://10.185.28.40:5000/api'; // Votre IP locale
 };
 
 const API = axios.create({
   baseURL: getBaseURL(),
-  timeout: 15000,
+  // timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },

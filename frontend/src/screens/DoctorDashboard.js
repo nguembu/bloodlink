@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Card, Title, Button, Text, FAB, Divider, Chip, ActivityIndicator } from 'react-native-paper';
+import { Card, Title, Button, Text, Chip, ActivityIndicator, TextInput } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import { alertService } from '../services/alertService';
@@ -33,21 +33,7 @@ export default function DoctorDashboard({ navigation }) {
       setAlerts(response.data.data.alerts || []);
     } catch (error) {
       console.error('Error loading alerts:', error);
-      // Simulation pour le développement
-      setAlerts([
-        {
-          _id: '1',
-          bloodType: 'A+',
-          urgency: 'high',
-          hospital: user?.hospital || 'Hôpital Central',
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          responses: [
-            { status: 'accepted', donor: { name: 'Jean Dupont', bloodType: 'A+' } },
-            { status: 'pending', donor: { name: 'Marie Curie', bloodType: 'A+' } }
-          ]
-        }
-      ]);
+      setAlerts([]); // Retrait des données de test
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -87,12 +73,10 @@ export default function DoctorDashboard({ navigation }) {
       setShowCreateAlert(false);
       setNewAlert({ bloodType: 'A+', urgency: 'medium', description: '' });
       loadAlerts();
-      alert('Alerte créée avec succès ! Les donneurs à proximité ont été notifiés.');
+      alert('Alerte créée avec succès !');
     } catch (error) {
       console.error('Error creating alert:', error);
-      alert('Alerte créée avec succès (simulation)');
-      setShowCreateAlert(false);
-      loadAlerts();
+      alert('Erreur lors de la création de l\'alerte');
     } finally {
       setLoading(false);
     }
@@ -105,8 +89,7 @@ export default function DoctorDashboard({ navigation }) {
       alert('Alerte annulée avec succès');
     } catch (error) {
       console.error('Error cancelling alert:', error);
-      alert('Alerte annulée (simulation)');
-      loadAlerts();
+      alert('Erreur lors de l\'annulation de l\'alerte');
     }
   };
 
@@ -129,28 +112,16 @@ export default function DoctorDashboard({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {/* En-tête */}
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {/* Header */}
         <Card style={styles.headerCard}>
           <Card.Content>
             <View style={styles.header}>
               <View>
-                <Title style={styles.welcomeTitle}>
-                  Bonjour, {user?.name || 'Docteur'}
-                </Title>
-                <Text style={styles.hospitalText}>
-                  {user?.hospital || 'Hôpital'}
-                </Text>
+                <Title style={styles.welcomeTitle}>Bonjour, {user?.name || 'Docteur'}</Title>
+                <Text style={styles.hospitalText}>{user?.hospital || 'Hôpital'}</Text>
               </View>
-              <Button 
-                mode="outlined" 
-                onPress={() => logout(navigation)}
-                style={styles.logoutButton}
-              >
+              <Button mode="outlined" onPress={() => logout(navigation)} style={styles.logoutButton}>
                 Déconnexion
               </Button>
             </View>
@@ -168,13 +139,13 @@ export default function DoctorDashboard({ navigation }) {
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>
-                  {alerts.reduce((acc, alert) => acc + alert.responses.filter(r => r.status === 'accepted').length, 0)}
+                  {alerts.reduce((acc, alert) => acc + (alert.responses?.filter(r => r.status === 'accepted').length || 0), 0)}
                 </Text>
                 <Text style={styles.statLabel}>Dons confirmés</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>
-                  {alerts.reduce((acc, alert) => acc + alert.responses.length, 0)}
+                  {alerts.reduce((acc, alert) => acc + (alert.responses?.length || 0), 0)}
                 </Text>
                 <Text style={styles.statLabel}>Réponses totales</Text>
               </View>
@@ -187,12 +158,7 @@ export default function DoctorDashboard({ navigation }) {
           <Card.Content>
             <View style={styles.alertsHeader}>
               <Title style={styles.alertsTitle}>Mes Alertes Actives</Title>
-              <Button 
-                mode="contained" 
-                onPress={() => setShowCreateAlert(true)}
-                style={styles.createAlertButton}
-                icon="plus"
-              >
+              <Button mode="contained" onPress={() => setShowCreateAlert(true)} style={styles.createAlertButton} icon="plus">
                 Nouvelle Alerte
               </Button>
             </View>
@@ -203,9 +169,7 @@ export default function DoctorDashboard({ navigation }) {
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateIcon}>🩸</Text>
                 <Text style={styles.emptyStateTitle}>Aucune alerte active</Text>
-                <Text style={styles.emptyStateText}>
-                  Créez votre première alerte pour trouver des donneurs compatibles
-                </Text>
+                <Text style={styles.emptyStateText}>Créez votre première alerte pour trouver des donneurs compatibles</Text>
               </View>
             ) : (
               alerts.map(alert => (
@@ -215,41 +179,18 @@ export default function DoctorDashboard({ navigation }) {
                       <View style={styles.alertBloodType}>
                         <Text style={styles.bloodTypeText}>{alert.bloodType}</Text>
                       </View>
-                      <Chip 
-                        mode="outlined"
-                        textStyle={{ color: getUrgencyColor(alert.urgency), fontWeight: '600' }}
-                        style={[styles.urgencyChip, { borderColor: getUrgencyColor(alert.urgency) }]}
-                      >
+                      <Chip mode="outlined" textStyle={{ color: getUrgencyColor(alert.urgency), fontWeight: '600' }} style={[styles.urgencyChip, { borderColor: getUrgencyColor(alert.urgency) }]}>
                         {getUrgencyLabel(alert.urgency)}
                       </Chip>
                     </View>
-                    
                     <Text style={styles.alertHospital}>{alert.hospital}</Text>
-                    <Text style={styles.alertDate}>
-                      Créée le {formatDate(alert.createdAt)}
-                    </Text>
-
-                    {alert.description && (
-                      <Text style={styles.alertDescription}>{alert.description}</Text>
-                    )}
-
+                    <Text style={styles.alertDate}>Créée le {formatDate(alert.createdAt)}</Text>
+                    {alert.description && <Text style={styles.alertDescription}>{alert.description}</Text>}
                     <View style={styles.alertStats}>
-                      <Text style={styles.alertStat}>
-                        ✅ {alert.responses.filter(r => r.status === 'accepted').length} acceptés
-                      </Text>
-                      <Text style={styles.alertStat}>
-                        ⏳ {alert.responses.filter(r => r.status === 'pending').length} en attente
-                      </Text>
+                      <Text style={styles.alertStat}>✅ {alert.responses?.filter(r => r.status === 'accepted').length || 0} acceptés</Text>
+                      <Text style={styles.alertStat}>⏳ {alert.responses?.filter(r => r.status === 'pending').length || 0} en attente</Text>
                     </View>
-
-                    <Button 
-                      mode="outlined" 
-                      onPress={() => cancelAlert(alert._id)}
-                      style={styles.cancelButton}
-                      textColor="#dc2626"
-                    >
-                      Annuler l'alerte
-                    </Button>
+                    <Button mode="outlined" onPress={() => cancelAlert(alert._id)} style={styles.cancelButton} textColor="#dc2626">Annuler l'alerte</Button>
                   </Card.Content>
                 </Card>
               ))
@@ -258,24 +199,18 @@ export default function DoctorDashboard({ navigation }) {
         </Card>
       </ScrollView>
 
-      {/* Modal de création d'alerte */}
+      {/* Modal création */}
       {showCreateAlert && (
         <View style={styles.modalOverlay}>
           <Card style={styles.modalCard}>
             <Card.Content>
               <Title style={styles.modalTitle}>Nouvelle Alerte</Title>
-              
+
               <Text style={styles.modalLabel}>Type sanguin requis</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.bloodTypeContainer}>
                   {bloodTypes.map(type => (
-                    <Button
-                      key={type}
-                      mode={newAlert.bloodType === type ? "contained" : "outlined"}
-                      onPress={() => setNewAlert(prev => ({ ...prev, bloodType: type }))}
-                      style={styles.bloodTypeOption}
-                      compact
-                    >
+                    <Button key={type} mode={newAlert.bloodType === type ? "contained" : "outlined"} onPress={() => setNewAlert(prev => ({ ...prev, bloodType: type }))} style={styles.bloodTypeOption} compact>
                       {type}
                     </Button>
                   ))}
@@ -285,46 +220,18 @@ export default function DoctorDashboard({ navigation }) {
               <Text style={styles.modalLabel}>Niveau d'urgence</Text>
               <View style={styles.urgencyContainer}>
                 {urgencyLevels.map(level => (
-                  <Button
-                    key={level.value}
-                    mode={newAlert.urgency === level.value ? "contained" : "outlined"}
-                    onPress={() => setNewAlert(prev => ({ ...prev, urgency: level.value }))}
-                    style={[styles.urgencyOption, { borderColor: level.color }]}
-                    labelStyle={newAlert.urgency === level.value ? { color: '#fff' } : { color: level.color }}
-                    compact
-                  >
+                  <Button key={level.value} mode={newAlert.urgency === level.value ? "contained" : "outlined"} onPress={() => setNewAlert(prev => ({ ...prev, urgency: level.value }))} style={[styles.urgencyOption, { borderColor: level.color }]} labelStyle={newAlert.urgency === level.value ? { color: '#fff' } : { color: level.color }} compact>
                     {level.label}
                   </Button>
                 ))}
               </View>
 
               <Text style={styles.modalLabel}>Description (optionnel)</Text>
-              <TextInput
-                value={newAlert.description}
-                onChangeText={(text) => setNewAlert(prev => ({ ...prev, description: text }))}
-                mode="outlined"
-                placeholder="Détails supplémentaires..."
-                multiline
-                numberOfLines={3}
-                style={styles.descriptionInput}
-              />
+              <TextInput value={newAlert.description} onChangeText={(text) => setNewAlert(prev => ({ ...prev, description: text }))} mode="outlined" placeholder="Détails supplémentaires..." multiline numberOfLines={3} style={styles.descriptionInput} />
 
               <View style={styles.modalActions}>
-                <Button 
-                  mode="outlined" 
-                  onPress={() => setShowCreateAlert(false)}
-                  style={styles.modalButton}
-                >
-                  Annuler
-                </Button>
-                <Button 
-                  mode="contained" 
-                  onPress={createAlert}
-                  loading={loading}
-                  style={styles.modalButton}
-                >
-                  Créer l'Alerte
-                </Button>
+                <Button mode="outlined" onPress={() => setShowCreateAlert(false)} style={styles.modalButton}>Annuler</Button>
+                <Button mode="contained" onPress={createAlert} loading={loading} style={styles.modalButton}>Créer l'Alerte</Button>
               </View>
             </Card.Content>
           </Card>
@@ -334,8 +241,7 @@ export default function DoctorDashboard({ navigation }) {
   );
 }
 
-// Ajouter cet import manquant
-const { TextInput } = require('react-native-paper');
+
 
 const styles = StyleSheet.create({
   container: {

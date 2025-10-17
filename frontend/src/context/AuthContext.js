@@ -2,12 +2,11 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { authService } from '../services/authService';
+import API from '../services/api'; // axios instance
 
 const AuthContext = createContext();
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -23,20 +22,21 @@ export const AuthProvider = ({ children }) => {
     try {
       const storedToken = await SecureStore.getItemAsync('authToken');
       console.log('🔐 Loading user, token exists:', !!storedToken);
-      
+
       if (storedToken) {
         setToken(storedToken);
-        // Vérifier si le token est encore valide en récupérant le profil
+        API.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
         try {
-          const response = await authService.getProfile();
-          setUser(response.data.data.user);
+          const profileData = await authService.getProfile();
+          setUser(profileData.user);
           console.log('✅ User loaded successfully');
         } catch (error) {
           console.log('❌ Token invalid, clearing...');
-          // Token invalide, on nettoie
           await SecureStore.deleteItemAsync('authToken');
           setToken(null);
           setUser(null);
+          delete API.defaults.headers.common['Authorization'];
         }
       }
     } catch (error) {
@@ -47,39 +47,38 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const showSuccessMessage = (message) => {
-    Alert.alert('Succès', message, [{ text: 'OK' }]);
-  };
-
-  const showErrorMessage = (message) => {
-    Alert.alert('Erreur', message, [{ text: 'OK' }]);
-  };
+  const showSuccessMessage = (message) => Alert.alert('Succès', message, [{ text: 'OK' }]);
+  const showErrorMessage = (message) => Alert.alert('Erreur', message, [{ text: 'OK' }]);
 
   const login = async (email, password, navigation) => {
     try {
       setLoading(true);
+
       const response = await authService.login(email, password);
-      
-      const { token: newToken, data } = response.data;
-      
+      const { token: newToken, user: newUser } = response;
+      console.log('🔐 Login response received', { newUser, newToken });
+
+      if (!newToken || !newUser) {
+        throw new Error('Réponse de connexion invalide');
+      }
+
       setToken(newToken);
-      setUser(data.user);
-      
-      // Stocker le token
+      setUser(newUser);
+
+      // Synchro SecureStore + Axios
       await SecureStore.setItemAsync('authToken', newToken);
-      console.log('🔐 Token stored successfully');
-      
-      // Message de succès
+      API.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      console.log('🔐 Token stored + synced with Axios');
+
       showSuccessMessage('Connexion réussie ! Bienvenue sur BloodLink.');
-      
-      // Redirection selon le rôle
-      if (data.user.role === 'doctor') {
+
+      if (newUser.role === 'doctor') {
         navigation.navigate('DoctorDashboard');
       } else {
         navigation.navigate('DonorDashboard');
       }
-      
-      return { success: true, data: response.data };
+
+      return { success: true, data: response };
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Erreur de connexion';
       showErrorMessage(message);
@@ -89,34 +88,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+
   const register = async (userData, navigation) => {
     try {
       setLoading(true);
       const response = await authService.register(userData);
+      const { token: newToken, user: newUser } = response;
 
-      const { token: newToken, data } = response.data;
-      
+      if (!newToken || !newUser) throw new Error("Réponse d'inscription invalide : token ou user manquant");
+
       setToken(newToken);
-      setUser(data.user);
-      
-      await SecureStore.setItemAsync('authToken', newToken);
-      console.log('🔐 Token stored after registration');
+      setUser(newUser);
 
-      // Message de succès personnalisé
-      const roleMessage = userData.role === 'doctor' 
+      // synchro SecureStore + axios
+      await SecureStore.setItemAsync('authToken', newToken);
+      API.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      console.log('🔐 Token stored after registration + synced with Axios');
+
+      const roleMessage = userData.role === 'doctor'
         ? 'Compte médecin créé avec succès ! Vous pouvez maintenant créer des alertes.'
         : 'Compte donneur créé avec succès ! Vous recevrez des alertes près de chez vous.';
-      
+
       showSuccessMessage(roleMessage);
-      
-      // Redirection selon le rôle
-      if (data.user.role === 'doctor') {
+
+      if (newUser.role === 'doctor') {
         navigation.navigate('DoctorDashboard');
       } else {
         navigation.navigate('DonorDashboard');
       }
-      
-      return { success: true, data: response.data };
+
+      return { success: true, data: response };
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Erreur lors de l\'inscription';
       showErrorMessage(message);
@@ -131,11 +132,10 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setToken(null);
       await SecureStore.deleteItemAsync('authToken');
+      delete API.defaults.headers.common['Authorization'];
+
       console.log('🔐 Token cleared on logout');
-      
-      // Redirection vers la page d'accueil
       navigation.navigate('Welcome');
-      
       showSuccessMessage('Déconnexion réussie. À bientôt !');
     } catch (error) {
       console.error('Error during logout:', error);
@@ -144,10 +144,9 @@ export const AuthProvider = ({ children }) => {
 
   const refreshToken = async () => {
     try {
-      const response = await authService.getProfile();
-      return { success: true, user: response.data.data.user };
+      const profileData = await authService.getProfile();
+      return { success: true, user: profileData.user };
     } catch (error) {
-      // Token invalide, déconnecter l'utilisateur
       await logout({ navigate: (route) => console.log('Should navigate to:', route) });
       return { success: false, message: 'Session expirée' };
     }
