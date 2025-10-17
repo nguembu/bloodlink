@@ -1,11 +1,14 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+/**
+ * Middleware pour protéger les routes
+ */
 const protect = async (req, res, next) => {
   try {
     let token;
-    
-    // 1) Vérifier si le token existe
+
+    // 1) Récupérer le token
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
     }
@@ -19,53 +22,39 @@ const protect = async (req, res, next) => {
 
     // 2) Vérifier le token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // 3) Vérifier si l'utilisateur existe toujours
-    const user = await User.findById(decoded.id);
-    
-    if (!user) {
-      return res.status(401).json({
-        status: 'error',
-        message: "L'utilisateur associé à ce token n'existe plus"
-      });
-    }
+    if (!decoded) throw new Error('Token invalide');
 
-    if (!user.isActive) {
+    // 3) Vérifier si l'utilisateur existe
+    const user = await User.findById(decoded.id);
+    if (!user || !user.isActive) {
       return res.status(401).json({
         status: 'error',
-        message: 'Votre compte a été désactivé'
+        message: 'Compte inexistant ou désactivé'
       });
     }
 
     // 4) Ajouter l'utilisateur à la requête
     req.user = user;
     next();
-    
+
   } catch (error) {
     console.error('Auth middleware error:', error);
-    
+
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Token invalide'
-      });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Votre session a expiré, veuillez vous reconnecter'
-      });
+      return res.status(401).json({ status: 'error', message: 'Token invalide' });
     }
 
-    res.status(401).json({
-      status: 'error',
-      message: 'Erreur d\'authentification'
-    });
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ status: 'error', message: 'Session expirée' });
+    }
+
+    res.status(401).json({ status: 'error', message: 'Erreur d\'authentification' });
   }
 };
 
-// Restreindre l'accès à des rôles spécifiques
+/**
+ * Middleware pour restreindre l'accès à certains rôles
+ */
 const restrictTo = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
@@ -78,7 +67,4 @@ const restrictTo = (...roles) => {
   };
 };
 
-module.exports = {
-  protect,
-  restrictTo
-};
+module.exports = { protect, restrictTo };

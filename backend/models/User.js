@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// === Définition du schéma utilisateur ===
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
@@ -10,49 +11,50 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
     validate: {
-      validator: function(email) {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-      },
-      message: 'Please provide a valid email'
+      validator: email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+      message: 'Please provide a valid email address'
     }
   },
+
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters'],
-    select: false
+    minlength: [8, 'Password must be at least 8 characters long'],
+    select: false // Ne jamais renvoyer le mot de passe
   },
+
   role: {
     type: String,
-    enum: {
-      values: ['doctor', 'donor'],
-      message: 'Role must be either doctor or donor'
-    },
+    enum: ['doctor', 'donor'],
     required: [true, 'Role is required']
   },
+
   name: {
     type: String,
-    required: function() { return this.role === 'donor'; },
     trim: true,
-    maxlength: [50, 'Name cannot exceed 50 characters']
+    maxlength: [50, 'Name cannot exceed 50 characters'],
+    required: function () { return this.role === 'donor'; }
   },
+
   bloodType: {
     type: String,
-    enum: {
-      values: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
-      message: 'Blood type must be one of: A+, A-, B+, B-, AB+, AB-, O+, O-'
-    },
-    required: function() { return this.role === 'donor'; }
+    enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+    required: function () { return this.role === 'donor'; }
   },
+
   hospital: {
     type: String,
-    required: function() { return this.role === 'doctor'; },
-    trim: true
+    trim: true,
+    required: function () { return this.role === 'doctor'; }
   },
+
   phone: {
     type: String,
-    trim: true
+    trim: true,
+    match: [/^\+?[0-9]{6,15}$/, 'Please provide a valid phone number']
   },
+
+  // Géolocalisation
   location: {
     type: {
       type: String,
@@ -65,82 +67,93 @@ const userSchema = new mongoose.Schema({
     },
     address: String
   },
-  fcmToken: String,
+
+  fcmToken: {
+    type: String,
+    trim: true
+  },
+
   isActive: {
     type: Boolean,
     default: true
   },
-  lastLogin: Date
+
+  lastLogin: {
+    type: Date
+  }
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Index pour les recherches géospatiales
+// === Indexes pour recherche et performances ===
 userSchema.index({ location: '2dsphere' });
 userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ bloodType: 1 });
 
-// Middleware de hachage du mot de passe
-userSchema.pre('save', async function(next) {
+// === Middleware : hash du mot de passe avant save ===
+userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
-userSchema.pre('save', function(next) {
-  if (this.isModified('location') && this.location.coordinates) {
-    // S'assurer que les coordonnées sont dans le bon ordre [lng, lat]
-    if (this.location.coordinates.length === 2) {
-      this.location.type = 'Point';
-    }
+// === Correction automatique de la géolocalisation ===
+userSchema.pre('save', function (next) {
+  if (this.location && Array.isArray(this.location.coordinates) && this.location.coordinates.length === 2) {
+    this.location.type = 'Point';
   }
   next();
 });
 
-// Méthodes d'instance
-userSchema.methods.correctPassword = async function(candidatePassword) {
+// === Méthodes d’instance ===
+
+// Vérifier le mot de passe
+userSchema.methods.correctPassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-userSchema.methods.updateLocation = function(latitude, longitude, address = '') {
+// Mise à jour de la géolocalisation
+userSchema.methods.updateLocation = async function (latitude, longitude, address = '') {
   this.location = {
     type: 'Point',
     coordinates: [longitude, latitude],
     address
   };
-  return this.save();
+  return await this.save();
 };
 
-userSchema.methods.deactivate = function() {
+// Désactivation du compte
+userSchema.methods.deactivate = async function () {
   this.isActive = false;
-  return this.save();
+  return await this.save();
 };
 
-// Virtual pour les alertes créées (médecins)
+// Générer le token JWT
+userSchema.methods.generateAuthToken = function () {
+  return jwt.sign(
+    { id: this._id, role: this.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  );
+};
+
+// === Relations virtuelles (populate) ===
+
+// Alertes créées (pour les docteurs)
 userSchema.virtual('alerts', {
   ref: 'Alert',
   foreignField: 'doctor',
   localField: '_id'
 });
 
-// Virtual pour les réponses aux alertes (donneurs)
+// Réponses aux alertes (pour les donneurs)
 userSchema.virtual('responses', {
   ref: 'Alert',
   foreignField: 'responses.donor',
   localField: '_id'
 });
-
-// Méthode pour générer le token JWT
-userSchema.methods.generateAuthToken = function() {
-  return jwt.sign(
-    { id: this._id }, 
-    process.env.JWT_SECRET, 
-    { expiresIn: process.env.JWT_EXPIRES_IN }
-  );
-};
 
 module.exports = mongoose.model('User', userSchema);
