@@ -8,19 +8,18 @@ const notificationSchema = new mongoose.Schema({
   },
   alert: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Alert',
-    required: false
+    ref: 'Alert'
   },
   type: {
     type: String,
     required: true,
-    enum: ['NEW_ALERT', 'ALERT_CANCELLED', 'DONATION_CONFIRMED', 'DONOR_ACCEPTED']
+    enum: ['NEW_ALERT', 'ALERT_CANCELLED', 'BLOOD_REQUEST', 'DONOR_ACCEPTED', 'BLOOD_RECEIVED']
   },
   title: {
     type: String,
     required: true
   },
-  body: {
+  message: {
     type: String,
     required: true
   },
@@ -28,26 +27,15 @@ const notificationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     default: {}
   },
-  status: {
-    type: String,
-    enum: ['sent', 'failed', 'pending'],
-    default: 'pending'
-  },
   read: {
     type: Boolean,
     default: false
-  },
-  error: {
-    type: String,
-    required: false
   }
 }, {
   timestamps: true
 });
 
-// Index pour les recherches fréquentes
 notificationSchema.index({ user: 1, createdAt: -1 });
-notificationSchema.index({ alert: 1 });
 notificationSchema.index({ read: 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

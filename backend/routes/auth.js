@@ -1,31 +1,15 @@
 const express = require('express');
-const { 
-  register, 
-  login, 
-  getProfile, 
-  updateProfile, 
-  updateLocation,
-  updateFCMToken 
-} = require('../controllers/authController');
+const { register, login, getProfile } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
-const { 
-  validateRegistration, 
-  validateLogin, 
-  validateLocation 
-} = require('../middleware/validation');
+const PasswordResetToken = require('../models/PasswordResetToken');
+const emailService = require('../utils/emailService');
+
 
 const router = express.Router();
 
-// Public routes
-router.post('/register', validateRegistration, register);
-router.post('/login', validateLogin, login);
+router.post('/register', register);
+router.post('/login', login);
+router.get('/profile', protect, getProfile);
 
-// Protected routes
-router.use(protect);
-
-router.get('/profile', getProfile);
-router.patch('/profile', updateProfile);
-router.patch('/location', validateLocation, updateLocation);
-router.patch('/fcm-token', updateFCMToken);
 
 module.exports = router;

@@ -1,499 +1,267 @@
 const Alert = require('../models/Alert');
 const User = require('../models/User');
-const mongoose = require('mongoose');
-const Notification = require('../models/Notification');
-const { findUsersInRadius, calculateDistance } = require('../utils/geolocation');
-const { notifyCompatibleDonors, sendPushNotification, NOTIFICATION_TYPES } = require('../utils/notification');
+const BloodBank = require('../models/BloodBank');
+const { findNearestBloodBanks } = require('../utils/geolocation');
+const { sendPushNotification } = require('../utils/notification');
 
-// Créer une alerte et notifier les donneurs compatibles
+// Médecin : Envoyer une alerte à la banque de sang
 exports.createAlert = async (req, res) => {
   try {
-    const { bloodType, hospital, location, urgency, radius, description } = req.body;
+    const { bloodType, quantity, urgency, patientInfo } = req.body;
 
-    // Validation des données requises
-    if (!bloodType || !hospital || !location) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Type sanguin, hôpital et localisation sont requis'
+    // Vérifier que l'utilisateur est un médecin
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({
+        success: false,
+        message: 'Seuls les médecins peuvent créer des alertes.'
       });
     }
 
-    // Vérifier que le médecin a un hôpital associé
-    if (!req.user.hospital) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Votre profil médecin doit avoir un hôpital associé'
+    // Trouver la banque de sang de l'hôpital du médecin
+    let bloodBank = await BloodBank.findOne({ 
+      hospitalName: req.user.hospital 
+    });
+
+    if (!bloodBank) {
+      return res.status(404).json({
+        success: false,
+        message: 'Aucune banque de sang trouvée pour votre hôpital.'
       });
     }
 
     // Créer l'alerte
     const alert = await Alert.create({
       doctor: req.user.id,
+      bloodBank: bloodBank._id,
       bloodType,
-      hospital: hospital || req.user.hospital,
-      hospitalLocation: {
-        type: 'Point',
-        coordinates: [location.longitude, location.latitude]
-      },
-      urgency: urgency || 'medium',
-      radius: radius || 5,
-      description: description || ''
+      quantity,
+      urgency,
+      patientInfo
     });
 
-    // Populer les données du docteur immédiatement
-    await alert.populate('doctor', 'name hospital phone');
-
-    console.log(`🆕 Nouvelle alerte créée: ${alert.bloodType} à ${alert.hospital}`);
-
-    // Trouver les donneurs compatibles dans le rayon
-    let donorsInRadius = [];
-    try {
-      donorsInRadius = await findUsersInRadius(
-        User, 
-        location.latitude, 
-        location.longitude, 
-        radius || 5, 
-        bloodType
-      );
-      
-      console.log(`📍 ${donorsInRadius.length} donneurs ${bloodType} trouvés dans un rayon de ${radius || 5}km`);
-
-    } catch (geoError) {
-      console.error('Erreur recherche géographique:', geoError);
-      // Continuer même si la recherche géo échoue
-    }
-
-    // Notifier les donneurs compatibles
-    let notificationResult = { successful: 0, failed: 0, total: 0 };
-    if (donorsInRadius.length > 0) {
-      try {
-        notificationResult = await notifyCompatibleDonors(alert);
-        
-        // Enregistrer les réponses initiales (tous en attente)
-        alert.responses = donorsInRadius.map(donor => ({
-          donor: donor._id,
-          status: 'pending',
-          notified: true
-        }));
-        
-        await alert.save();
-        
-        console.log(`✅ ${notificationResult.successful} notifications envoyées avec succès`);
-
-      } catch (notifyError) {
-        console.error('Erreur envoi notifications:', notifyError);
-        // Continuer même si les notifications échouent
-      }
-    }
+    // Notifier la banque de sang
+    await sendPushNotification(
+      bloodBank.user,
+      alert,
+      'BLOOD_REQUEST',
+      `Demande de sang ${bloodType} - ${quantity} unité(s)`
+    );
 
     res.status(201).json({
-      status: 'success',
-      message: `Alerte créée avec succès. ${donorsInRadius.length} donneurs potentiels notifiés.`,
-      data: { 
-        alert,
-        notifications: notificationResult
-      }
+      success: true,
+      message: 'Alerte créée avec succès',
+      data: { alert }
     });
 
   } catch (error) {
-    console.error('❌ Create alert error:', error);
     res.status(400).json({
-      status: 'error',
-      message: error.message || 'Erreur lors de la création de l\'alerte',
-      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+      success: false,
+      message: error.message
     });
   }
 };
 
-// Récupérer les alertes actives avec pagination
-exports.getActiveAlerts = async (req, res) => {
+// Banque de sang : Recevoir une requête et la propager si nécessaire
+exports.propagateAlert = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
+    const { alertId } = req.params;
 
-    const alerts = await Alert.find({ 
-      status: 'active',
-      expiresAt: { $gt: new Date() }
-    })
-    .populate('doctor', 'name hospital phone')
-    .populate('responses.donor', 'name bloodType phone')
-    .sort({ urgency: -1, createdAt: -1 }) // Tri par urgence puis date
-    .skip(skip)
-    .limit(limit);
-
-    const total = await Alert.countDocuments({ 
-      status: 'active',
-      expiresAt: { $gt: new Date() }
-    });
-
-    res.json({
-      status: 'success',
-      results: alerts.length,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      },
-      data: { alerts }
-    });
-  } catch (error) {
-    console.error('❌ Get active alerts error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: 'Erreur lors de la récupération des alertes actives'
-    });
-  }
-};
-
-// Récupérer les alertes d'un médecin avec filtres
-exports.getMyAlerts = async (req, res) => {
-  try {
-    const { status, bloodType, page = 1, limit = 20 } = req.query;
-    const skip = (page - 1) * limit;
-
-    // Construction de la requête
-    let query = { doctor: req.user.id };
-    
-    if (status && status !== 'all') {
-      query.status = status;
-    }
-    
-    if (bloodType && bloodType !== 'all') {
-      query.bloodType = bloodType;
-    }
-
-    const alerts = await Alert.find(query)
-      .populate('responses.donor', 'name bloodType phone location')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Alert.countDocuments(query);
-
-    // Calculer les statistiques
-    const stats = {
-      total: await Alert.countDocuments({ doctor: req.user.id }),
-      active: await Alert.countDocuments({ doctor: req.user.id, status: 'active' }),
-      fulfilled: await Alert.countDocuments({ doctor: req.user.id, status: 'fulfilled' }),
-      cancelled: await Alert.countDocuments({ doctor: req.user.id, status: 'cancelled' })
-    };
-
-    res.json({
-      status: 'success',
-      results: alerts.length,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
-      },
-      stats,
-      data: { alerts }
-    });
-  } catch (error) {
-    console.error('❌ Get my alerts error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: 'Erreur lors de la récupération de vos alertes'
-    });
-  }
-};
-
-// Annuler une alerte et notifier les donneurs concernés
-exports.cancelAlert = async (req, res) => {
-  try {
-    const alert = await Alert.findOne({
-      _id: req.params.id,
-      doctor: req.user.id
-    }).populate('responses.donor');
+    const alert = await Alert.findById(alertId)
+      .populate('doctor')
+      .populate('bloodBank');
 
     if (!alert) {
       return res.status(404).json({
-        status: 'error',
-        message: 'Alerte non trouvée'
+        success: false,
+        message: 'Alerte non trouvée.'
       });
     }
 
-    if (alert.status !== 'active') {
+    // Vérifier que l'utilisateur est la banque de sang concernée
+    const bloodBank = await BloodBank.findOne({ user: req.user.id });
+    if (!bloodBank || alert.bloodBank._id.toString() !== bloodBank._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non autorisé à propager cette alerte.'
+      });
+    }
+
+    // Vérifier si la banque a du sang disponible
+    if (bloodBank.hasBloodAvailable(alert.bloodType, alert.quantity)) {
       return res.status(400).json({
-        status: 'error',
-        message: 'Seules les alertes actives peuvent être annulées'
+        success: false,
+        message: 'Votre banque a déjà ce sang disponible. Pas besoin de propagation.'
       });
     }
 
-    // Notifier les donneurs qui ont accepté ou sont en attente
-    const donorsToNotify = await User.find({
-      _id: { 
-        $in: alert.responses
-          .filter(r => r.status === 'accepted' || r.status === 'pending')
-          .map(r => r.donor)
-      },
-      fcmToken: { $exists: true, $ne: null }
+    // Trouver les banques de sang les plus proches
+    const nearestBanks = await findNearestBloodBanks(
+      bloodBank.location.coordinates[1],
+      bloodBank.location.coordinates[0],
+      5 // 5 banques les plus proches
+    );
+
+    // Filtrer pour exclure la banque actuelle
+    const otherBanks = nearestBanks.filter(bank => 
+      bank._id.toString() !== bloodBank._id.toString()
+    );
+
+    // Propager l'alerte aux autres banques
+    for (const bank of otherBanks) {
+      await alert.propagateToBloodBank(bank._id);
+      
+      // Notifier la banque de sang
+      const bankUser = await User.findById(bank.user);
+      await sendPushNotification(
+        bankUser,
+        alert,
+        'BLOOD_REQUEST',
+        `Demande propagée: Sang ${alert.bloodType} - ${alert.quantity} unité(s)`
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `Alerte propagée à ${otherBanks.length} banques de sang.`,
+      data: { propagatedTo: otherBanks.length }
     });
 
-    console.log(`🔔 Notification d'annulation à ${donorsToNotify.length} donneurs`);
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
 
-    if (donorsToNotify.length > 0) {
-      try {
-        await Promise.allSettled(
-          donorsToNotify.map(donor => 
-            sendPushNotification(donor, alert, NOTIFICATION_TYPES.ALERT_CANCELLED)
-          )
-        );
-      } catch (notifyError) {
-        console.error('Erreur notification annulation:', notifyError);
-      }
+// Banque de sang : Valider la réception de sang
+exports.validateReception = async (req, res) => {
+  try {
+    const { alertId } = req.params;
+
+    const alert = await Alert.findById(alertId);
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        message: 'Alerte non trouvée.'
+      });
     }
 
-    // Annuler l'alerte
-    await alert.cancel();
+    // Vérifier les permissions
+    const bloodBank = await BloodBank.findOne({ user: req.user.id });
+    if (!bloodBank) {
+      return res.status(403).json({
+        success: false,
+        message: 'Accès réservé aux banques de sang.'
+      });
+    }
 
-    // Marquer les notifications comme obsolètes
-    await Notification.updateMany(
-      { alert: alert._id, read: false },
-      { $set: { status: 'cancelled' } }
+    // Marquer comme rempli
+    await alert.fulfill();
+
+    // Mettre à jour l'inventaire
+    await bloodBank.updateInventory(alert.bloodType, alert.quantity);
+
+    // Notifier le médecin
+    const doctor = await User.findById(alert.doctor);
+    await sendPushNotification(
+      doctor,
+      alert,
+      'BLOOD_RECEIVED',
+      `Sang ${alert.bloodType} reçu avec succès`
     );
 
     res.json({
-      status: 'success',
-      message: `Alerte annulée avec succès. ${donorsToNotify.length} donneurs notifiés.`,
-      data: { alert: await alert.populate('responses.donor', 'name bloodType phone') }
+      success: true,
+      message: 'Réception de sang validée avec succès.',
+      data: { alert }
     });
+
   } catch (error) {
-    console.error('❌ Cancel alert error:', error);
     res.status(400).json({
-      status: 'error',
-      message: 'Erreur lors de l\'annulation de l\'alerte'
+      success: false,
+      message: error.message
     });
   }
 };
 
-// Marquer une alerte comme remplie
-exports.fulfillAlert = async (req, res) => {
+// Banque de sang : Annuler une alerte
+exports.cancelAlert = async (req, res) => {
   try {
-    const alert = await Alert.findOne({
-      _id: req.params.id,
-      doctor: req.user.id
-    });
+    const { alertId } = req.params;
 
+    const alert = await Alert.findById(alertId);
     if (!alert) {
       return res.status(404).json({
-        status: 'error',
-        message: 'Alerte non trouvée'
+        success: false,
+        message: 'Alerte non trouvée.'
       });
     }
 
-    if (alert.status !== 'active') {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Seules les alertes actives peuvent être marquées comme remplies'
+    // Vérifier les permissions
+    const bloodBank = await BloodBank.findOne({ user: req.user.id });
+    if (!bloodBank || alert.bloodBank.toString() !== bloodBank._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non autorisé à annuler cette alerte.'
       });
     }
 
-    await alert.fulfill();
+    await alert.cancel();
 
-    // Notifier les donneurs qui ont accepté
-    const acceptedDonors = await User.find({
-      _id: { 
-        $in: alert.responses
-          .filter(r => r.status === 'accepted')
-          .map(r => r.donor)
-      },
-      fcmToken: { $exists: true, $ne: null }
-    });
-
-    if (acceptedDonors.length > 0) {
-      try {
-        await Promise.allSettled(
-          acceptedDonors.map(donor => 
-            sendPushNotification(donor, alert, NOTIFICATION_TYPES.DONATION_CONFIRMED)
-          )
-        );
-      } catch (notifyError) {
-        console.error('Erreur notification confirmation:', notifyError);
-      }
-    }
+    // Notifier le médecin
+    const doctor = await User.findById(alert.doctor);
+    await sendPushNotification(
+      doctor,
+      alert,
+      'ALERT_CANCELLED',
+      'Alerte annulée par la banque de sang'
+    );
 
     res.json({
-      status: 'success',
-      message: `Alerte marquée comme remplie. ${acceptedDonors.length} donneurs remerciés.`,
-      data: { alert: await alert.populate('responses.donor', 'name bloodType phone') }
+      success: true,
+      message: 'Alerte annulée avec succès.',
+      data: { alert }
     });
+
   } catch (error) {
-    console.error('❌ Fulfill alert error:', error);
     res.status(400).json({
-      status: 'error',
-      message: 'Erreur lors de la mise à jour de l\'alerte'
+      success: false,
+      message: error.message
     });
   }
 };
 
-// Obtenir les détails d'une alerte
-exports.getAlert = async (req, res) => {
+// Obtenir les alertes pour une banque de sang
+exports.getBloodBankAlerts = async (req, res) => {
   try {
-    const alert = await Alert.findById(req.params.id)
-      .populate('doctor', 'name hospital phone email')
-      .populate('responses.donor', 'name bloodType phone location');
-
-    if (!alert) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Alerte non trouvée'
+    const bloodBank = await BloodBank.findOne({ user: req.user.id });
+    if (!bloodBank) {
+      return res.status(403).json({
+        success: false,
+        message: 'Accès réservé aux banques de sang.'
       });
     }
 
-    // Calculer les statistiques de réponse
-    const responseStats = {
-      total: alert.responses.length,
-      accepted: alert.responses.filter(r => r.status === 'accepted').length,
-      declined: alert.responses.filter(r => r.status === 'declined').length,
-      pending: alert.responses.filter(r => r.status === 'pending').length
-    };
+    const alerts = await Alert.find({
+      $or: [
+        { bloodBank: bloodBank._id },
+        { 'propagatedTo.bloodBank': bloodBank._id }
+      ]
+    })
+    .populate('doctor', 'name hospital phone')
+    .populate('bloodBank', 'hospitalName')
+    .sort({ createdAt: -1 });
 
     res.json({
-      status: 'success',
-      data: { 
-        alert,
-        stats: responseStats
-      }
-    });
-  } catch (error) {
-    console.error('❌ Get alert error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: 'Erreur lors de la récupération de l\'alerte'
-    });
-  }
-};
-
-// Statistiques des alertes pour le médecin
-exports.getAlertStats = async (req, res) => {
-  try {
-    const doctorId = req.user.id;
-
-    const stats = await Alert.aggregate([
-      { $match: { doctor: mongoose.Types.ObjectId(doctorId) } },
-      {
-        $group: {
-          _id: null,
-          totalAlerts: { $sum: 1 },
-          activeAlerts: {
-            $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
-          },
-          fulfilledAlerts: {
-            $sum: { $cond: [{ $eq: ['$status', 'fulfilled'] }, 1, 0] }
-          },
-          totalResponses: { $sum: { $size: '$responses' } },
-          acceptedResponses: {
-            $sum: {
-              $size: {
-                $filter: {
-                  input: '$responses',
-                  as: 'response',
-                  cond: { $eq: ['$$response.status', 'accepted'] }
-                }
-              }
-            }
-          },
-          bloodTypeDistribution: {
-            $push: {
-              bloodType: '$bloodType',
-              count: 1
-            }
-          }
-        }
-      }
-    ]);
-
-    const bloodTypeStats = await Alert.aggregate([
-      { $match: { doctor: mongoose.Types.ObjectId(doctorId) } },
-      {
-        $group: {
-          _id: '$bloodType',
-          count: { $sum: 1 },
-          avgResponses: { $avg: { $size: '$responses' } }
-        }
-      },
-      { $sort: { count: -1 } }
-    ]);
-
-    const result = stats[0] || {
-      totalAlerts: 0,
-      activeAlerts: 0,
-      fulfilledAlerts: 0,
-      totalResponses: 0,
-      acceptedResponses: 0
-    };
-
-    result.bloodTypeStats = bloodTypeStats;
-
-    res.json({
-      status: 'success',
-      data: { stats: result }
-    });
-  } catch (error) {
-    console.error('❌ Get alert stats error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: 'Erreur lors de la récupération des statistiques'
-    });
-  }
-};
-
-// Recherche et filtrage des alertes
-exports.searchAlerts = async (req, res) => {
-  try {
-    const { bloodType, hospital, urgency, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
-    const skip = (page - 1) * limit;
-
-    let query = { status: 'active', expiresAt: { $gt: new Date() } };
-
-    // Filtres
-    if (bloodType && bloodType !== 'all') {
-      query.bloodType = bloodType;
-    }
-
-    if (hospital) {
-      query.hospital = { $regex: hospital, $options: 'i' };
-    }
-
-    if (urgency && urgency !== 'all') {
-      query.urgency = urgency;
-    }
-
-    if (dateFrom || dateTo) {
-      query.createdAt = {};
-      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) query.createdAt.$lte = new Date(dateTo);
-    }
-
-    const alerts = await Alert.find(query)
-      .populate('doctor', 'name hospital phone')
-      .populate('responses.donor', 'name bloodType')
-      .sort({ urgency: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Alert.countDocuments(query);
-
-    res.json({
-      status: 'success',
-      results: alerts.length,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
-      },
+      success: true,
       data: { alerts }
     });
+
   } catch (error) {
-    console.error('❌ Search alerts error:', error);
     res.status(400).json({
-      status: 'error',
-      message: 'Erreur lors de la recherche des alertes'
+      success: false,
+      message: error.message
     });
   }
 };

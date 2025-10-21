@@ -1,22 +1,20 @@
 const express = require('express');
 const {
+  notifyDonors,
   respondToAlert,
-  getNearbyAlerts,
-  getDonationHistory,
-  getDonorStats
+  getNearbyAlerts
 } = require('../controllers/donorController');
-const { protect, restrictTo } = require('../middleware/auth');
-const { validateAlertResponse } = require('../middleware/validation');
+const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// 🔥 TOUTES les routes doivent être protégées et réservées aux donneurs
 router.use(protect);
-router.use(restrictTo('donor'));
 
-router.get('/nearby-alerts', getNearbyAlerts);
-router.get('/donation-history', getDonationHistory);
-router.get('/stats', getDonorStats);
-router.post('/alert/:alertId/respond', validateAlertResponse, respondToAlert);
+// Banques de sang
+router.post('/notify', authorize('bloodbank'), notifyDonors);
+
+// Donneurs
+router.get('/nearby-alerts', authorize('donor'), getNearbyAlerts);
+router.post('/alert/:alertId/respond', authorize('donor'), respondToAlert);
 
 module.exports = router;

@@ -1,12 +1,10 @@
 import React from 'react';
-import { View, StyleSheet, Image, Dimensions, ScrollView,TouchableOpacity } from 'react-native';
-import { Button, Text, Card, useTheme } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { Button, Text, Card } from 'react-native-paper';
 
 const { width } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigation }) {
-  const theme = useTheme();
-
   return (
     <ScrollView 
       style={styles.container}
@@ -32,6 +30,7 @@ export default function WelcomeScreen({ navigation }) {
 
       {/* Cartes de sélection de rôle */}
       <View style={styles.rolesContainer}>
+        {/* Carte Médecin */}
         <Card 
           style={[styles.roleCard, styles.doctorCard]}
           onPress={() => navigation.navigate('Register', { role: 'doctor' })}
@@ -41,18 +40,20 @@ export default function WelcomeScreen({ navigation }) {
             <Text style={styles.roleIcon}>👨‍⚕️</Text>
             <Text style={styles.roleTitle}>Médecin</Text>
             <Text style={styles.roleDescription}>
-              Lancez des alertes pour trouver des donneurs compatibles
+              Lancez des alertes pour trouver des donneurs compatibles auprès des banques de sang
             </Text>
             <Button 
               mode="contained" 
               style={styles.roleButton}
               labelStyle={styles.buttonLabel}
+              onPress={() => navigation.navigate('Register', { role: 'doctor' })}
             >
               Continuer
             </Button>
           </Card.Content>
         </Card>
 
+        {/* Carte Donneur */}
         <Card 
           style={[styles.roleCard, styles.donorCard]}
           onPress={() => navigation.navigate('Register', { role: 'donor' })}
@@ -62,12 +63,36 @@ export default function WelcomeScreen({ navigation }) {
             <Text style={styles.roleIcon}>🦸</Text>
             <Text style={styles.roleTitle}>Donneur</Text>
             <Text style={styles.roleDescription}>
-              Recevez des alertes et sauvez des vies près de chez vous
+              Recevez des alertes des banques de sang et sauvez des vies près de chez vous
             </Text>
             <Button 
               mode="contained" 
               style={styles.roleButton}
               labelStyle={styles.buttonLabel}
+              onPress={() => navigation.navigate('Register', { role: 'donor' })}
+            >
+              Continuer
+            </Button>
+          </Card.Content>
+        </Card>
+
+        {/* Carte Banque de Sang */}
+        <Card 
+          style={[styles.roleCard, styles.bloodbankCard]}
+          onPress={() => navigation.navigate('Register', { role: 'bloodbank' })}
+          mode="elevated"
+        >
+          <Card.Content style={styles.cardContent}>
+            <Text style={styles.roleIcon}>🏥</Text>
+            <Text style={styles.roleTitle}>Banque de Sang</Text>
+            <Text style={styles.roleDescription}>
+              Gérez votre stock de sang et coordonnez les dons entre médecins et donneurs
+            </Text>
+            <Button 
+              mode="contained" 
+              style={styles.roleButton}
+              labelStyle={styles.buttonLabel}
+              onPress={() => navigation.navigate('Register', { role: 'bloodbank' })}
             >
               Continuer
             </Button>
@@ -96,10 +121,10 @@ export default function WelcomeScreen({ navigation }) {
         </Button>
       </View>
 
-      {/* Informations supplémentaires pour le défilement */}
+      {/* Informations supplémentaires */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Plateforme sécurisée de mise en relation donneurs-médecins
+          Plateforme sécurisée de mise en relation donneurs - banques de sang - médecins
         </Text>
       </View>
     </ScrollView>
@@ -116,7 +141,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 40,
-    minHeight: '100%', // Assure que le contenu prend au moins toute la hauteur
+    minHeight: '100%',
   },
   header: {
     alignItems: 'center',
@@ -179,6 +204,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderLeftWidth: 4,
     borderLeftColor: '#2563eb',
+  },
+  bloodbankCard: {
+    backgroundColor: '#ffffff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#059669',
   },
   cardContent: {
     padding: 24,
