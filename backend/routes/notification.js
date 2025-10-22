@@ -1,15 +1,14 @@
 const express = require('express');
-const { protect } = require('../middleware/auth');
+const { protectUser } = require('../middleware/auth');
 const { 
   getNotificationHistory, 
-  markAsRead,
-  updateFCMToken 
+  markAsRead
 } = require('../utils/notification');
 
 const router = express.Router();
 
-// Toutes les routes protégées
-router.use(protect);
+// Toutes les routes protégées pour les Users
+router.use(protectUser);
 
 // Obtenir l'historique des notifications
 router.get('/history', async (req, res) => {
@@ -17,13 +16,12 @@ router.get('/history', async (req, res) => {
     const notifications = await getNotificationHistory(req.user.id);
     
     res.json({
-      status: 'success',
-      results: notifications.length,
+      success: true,
       data: { notifications }
     });
   } catch (error) {
     res.status(400).json({
-      status: 'error',
+      success: false,
       message: 'Erreur lors de la récupération des notifications'
     });
   }
@@ -32,22 +30,23 @@ router.get('/history', async (req, res) => {
 // Marquer une notification comme lue
 router.patch('/:id/read', async (req, res) => {
   try {
-    const success = await markAsRead(req.params.id);
+    const notification = await markAsRead(req.params.id);
     
-    if (success) {
+    if (notification) {
       res.json({
-        status: 'success',
-        message: 'Notification marquée comme lue'
+        success: true,
+        message: 'Notification marquée comme lue',
+        data: { notification }
       });
     } else {
       res.status(404).json({
-        status: 'error',
+        success: false,
         message: 'Notification non trouvée'
       });
     }
   } catch (error) {
     res.status(400).json({
-      status: 'error',
+      success: false,
       message: 'Erreur lors de la mise à jour de la notification'
     });
   }
@@ -60,27 +59,21 @@ router.post('/fcm-token', async (req, res) => {
     
     if (!fcmToken) {
       return res.status(400).json({
-        status: 'error',
+        success: false,
         message: 'Token FCM requis'
       });
     }
 
-    const success = await updateFCMToken(req.user.id, fcmToken);
+    req.user.fcmToken = fcmToken;
+    await req.user.save();
     
-    if (success) {
-      res.json({
-        status: 'success',
-        message: 'Token FCM mis à jour avec succès'
-      });
-    } else {
-      res.status(400).json({
-        status: 'error',
-        message: 'Erreur lors de la mise à jour du token FCM'
-      });
-    }
+    res.json({
+      success: true,
+      message: 'Token FCM mis à jour avec succès'
+    });
   } catch (error) {
     res.status(400).json({
-      status: 'error',
+      success: false,
       message: 'Erreur lors de la mise à jour du token FCM'
     });
   }

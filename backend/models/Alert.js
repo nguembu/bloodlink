@@ -36,18 +36,6 @@ const alertSchema = new mongoose.Schema({
     age: Number,
     condition: String
   },
-  // Suivi de la propagation aux autres banques de sang
-  propagatedTo: [{
-    bloodBank: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'BloodBank'
-    },
-    status: {
-      type: String,
-      enum: ['pending', 'approved', 'rejected']
-    },
-    respondedAt: Date
-  }],
   // Réponses des donneurs
   responses: [{
     donor: {
@@ -64,6 +52,11 @@ const alertSchema = new mongoose.Schema({
     },
     message: String
   }],
+  // Donneur qui a accepté l'alerte
+  acceptedDonor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   expiresAt: {
     type: Date,
     default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 heures
@@ -78,15 +71,6 @@ alertSchema.index({ bloodType: 1 });
 alertSchema.index({ doctor: 1 });
 alertSchema.index({ bloodBank: 1 });
 
-// Méthode pour propager l'alerte à une autre banque de sang
-alertSchema.methods.propagateToBloodBank = function(bloodBankId) {
-  this.propagatedTo.push({
-    bloodBank: bloodBankId,
-    status: 'pending'
-  });
-  return this.save();
-};
-
 // Méthode pour annuler l'alerte
 alertSchema.methods.cancel = function() {
   this.status = 'cancelled';
@@ -96,6 +80,13 @@ alertSchema.methods.cancel = function() {
 // Méthode pour valider la réception
 alertSchema.methods.fulfill = function() {
   this.status = 'fulfilled';
+  return this.save();
+};
+
+// Méthode pour accepter un donneur et annuler pour les autres
+alertSchema.methods.acceptDonor = function(donorId) {
+  this.acceptedDonor = donorId;
+  this.status = 'fulfilled'; // On marque comme rempli dès qu'un donneur accepte
   return this.save();
 };
 

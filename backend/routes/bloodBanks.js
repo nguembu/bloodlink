@@ -2,19 +2,19 @@ const express = require('express');
 const {
   updateInventory,
   getInventory,
-  findNearbyBloodBanks
+  findNearbyBloodBanks,
+  getBloodBankProfile
 } = require('../controllers/bloodBankController');
-const { protect, authorize } = require('../middleware/auth');
+const { protectBloodBank } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.use(protect);
+// Routes BloodBank (protégées par protectBloodBank)
+router.patch('/inventory', protectBloodBank, updateInventory);
+router.get('/inventory', protectBloodBank, getInventory);
+router.get('/profile', protectBloodBank, getBloodBankProfile);
 
-// Banques de sang
-router.patch('/inventory', authorize('bloodbank'), updateInventory);
-router.get('/inventory', authorize('bloodbank'), getInventory);
-
-// Public (médecins et donneurs)
+// Route publique pour trouver les banques de sang à proximité
 router.get('/nearby', findNearbyBloodBanks);
 
 module.exports = router;

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Title, Card, Text } from 'react-native-paper';
+import { TextInput, Button, Title, Card, Text, SegmentedButtons } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginScreen({ navigation, route }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [userType, setUserType] = useState<'user' | 'bloodbank'>('user');
   const { login, loading } = useAuth();
 
   const role = route.params?.role;
@@ -17,7 +18,7 @@ export default function LoginScreen({ navigation, route }: any) {
       return;
     }
 
-    await login(email, password, navigation);
+    await login(email, password, userType, navigation);
   };
 
   return (
@@ -31,11 +32,35 @@ export default function LoginScreen({ navigation, route }: any) {
             <View style={styles.header}>
               <Text style={styles.headerIcon}>🔐</Text>
               <Title style={styles.title}>
-                Connexion {role ? `- ${role === 'doctor' ? 'Médecin' : role === 'donor' ? 'Donneur' : 'Banque de Sang'}` : ''}
+                Connexion
               </Title>
               <Text style={styles.subtitle}>
                 Accédez à votre compte BloodLink
               </Text>
+            </View>
+
+            {/* Sélection du type d'utilisateur */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Type de compte :</Text>
+              <SegmentedButtons
+                value={userType}
+                onValueChange={setUserType}
+                buttons={[
+                  {
+                    value: 'user',
+                    label: 'Utilisateur',
+                    icon: 'account',
+                    style: userType === 'user' ? styles.selectedSegment : {}
+                  },
+                  {
+                    value: 'bloodbank',
+                    label: 'Banque de Sang',
+                    icon: 'hospital',
+                    style: userType === 'bloodbank' ? styles.selectedSegment : {}
+                  },
+                ]}
+                style={styles.segmentedButtons}
+              />
             </View>
             
             <TextInput
@@ -74,11 +99,14 @@ export default function LoginScreen({ navigation, route }: any) {
               onPress={handleLogin}
               loading={loading}
               disabled={loading}
-              style={styles.loginButton}
+              style={[
+                styles.loginButton,
+                userType === 'bloodbank' ? styles.bloodbankButton : styles.userButton
+              ]}
               labelStyle={styles.buttonLabel}
               contentStyle={styles.buttonContent}
             >
-              Se connecter
+              {userType === 'bloodbank' ? 'Connexion Banque de Sang' : 'Se connecter'}
             </Button>
 
             <View style={styles.registerSection}>
@@ -138,14 +166,34 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 22,
   },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  segmentedButtons: {
+    marginBottom: 8,
+  },
+  selectedSegment: {
+    backgroundColor: '#dc2626',
+  },
   input: {
     marginBottom: 16,
     backgroundColor: '#ffffff',
   },
   loginButton: {
     marginTop: 10,
-    backgroundColor: '#dc2626',
     borderRadius: 12,
+  },
+  userButton: {
+    backgroundColor: '#2563eb',
+  },
+  bloodbankButton: {
+    backgroundColor: '#059669',
   },
   buttonLabel: {
     fontSize: 16,

@@ -1,3 +1,4 @@
+// context/AuthContext.tsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
@@ -8,7 +9,7 @@ interface User {
   _id: string;
   email: string;
   name: string;
-  role: 'donor' | 'doctor' | 'bloodbank';
+  role: 'donor' | 'doctor';
   bloodType?: string;
   hospital?: string;
   phone?: string;
@@ -19,6 +20,7 @@ interface BloodBank {
   hospitalName: string;
   address: string;
   phone: string;
+  email: string;
 }
 
 interface AuthContextType {
@@ -26,8 +28,8 @@ interface AuthContextType {
   bloodBank: BloodBank | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string, navigation: any) => Promise<{ success: boolean; message?: string }>;
-  register: (userData: any, navigation: any) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password: string, userType: 'user' | 'bloodbank', navigation: any) => Promise<{ success: boolean; message?: string }>;
+  register: (userData: any, userType: 'user' | 'bloodbank', navigation: any) => Promise<{ success: boolean; message?: string }>;
   logout: (navigation: any) => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -55,29 +57,50 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const loadUser = async () => {
     try {
       const storedToken = await SecureStore.getItemAsync('authToken');
-      console.log('🔐 Chargement utilisateur, token présent:', !!storedToken);
+      const userType = await SecureStore.getItemAsync('userType');
+      
+      console.log('🔐 Chargement utilisateur:', { 
+        tokenPresent: !!storedToken, 
+        userType 
+      });
 
-      if (storedToken) {
-        setToken(storedToken);
-        API.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+      if (!storedToken) {
+        console.log('🔐 Aucun token trouvé');
+        setLoading(false);
+        return;
+      }
 
-        try {
+      setToken(storedToken);
+      API.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
+      try {
+        if (userType === 'bloodbank') {
+          console.log('🩸 Chargement profil BloodBank...');
+          const profileData = await authService.getBloodBankProfile();
+          setBloodBank(profileData.data.bloodBank);
+          setUser(null);
+          console.log('✅ Profil BloodBank chargé');
+        } else {
+          console.log('👤 Chargement profil User...');
           const profileData = await authService.getProfile();
           setUser(profileData.data.user);
-          setBloodBank(profileData.data.bloodBank || null);
-          console.log('✅ Utilisateur chargé avec succès');
-        } catch (error) {
-          console.log('❌ Token invalide, nettoyage...');
-          await SecureStore.deleteItemAsync('authToken');
-          setToken(null);
-          setUser(null);
           setBloodBank(null);
-          delete API.defaults.headers.common['Authorization'];
+          console.log('✅ Profil User chargé');
         }
+      } catch (error: any) {
+        console.log('❌ Erreur chargement profil:', error.message);
+        // Nettoyer les données corrompues
+        await SecureStore.deleteItemAsync('authToken');
+        await SecureStore.deleteItemAsync('userType');
+        setToken(null);
+        setUser(null);
+        setBloodBank(null);
+        delete API.defaults.headers.common['Authorization'];
       }
     } catch (error) {
       console.error('Erreur chargement utilisateur:', error);
       await SecureStore.deleteItemAsync('authToken');
+      await SecureStore.deleteItemAsync('userType');
     } finally {
       setLoading(false);
     }
@@ -89,37 +112,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const showErrorMessage = (message: string) => 
     Alert.alert('Erreur', message, [{ text: 'OK' }]);
 
-  const login = async (email: string, password: string, navigation: any) => {
+  const login = async (email: string, password: string, userType: 'user' | 'bloodbank', navigation: any) => {
     try {
       setLoading(true);
-      const response = await authService.login(email, password);
+      console.log(`🔐 Tentative de connexion ${userType}:`, email);
+      
+      let response;
+      if (userType === 'bloodbank') {
+        response = await authService.loginBloodBank(email, password);
+      } else {
+        response = await authService.login(email, password);
+      }
+
       const { token: newToken, user: newUser, bloodBank: newBloodBank } = response;
 
-      if (!newToken || !newUser) {
+      if (!newToken) {
         throw new Error('Réponse de connexion invalide');
       }
 
-      setToken(newToken);
-      setUser(newUser);
+      // 🔥 CORRECTION : S'assurer que c'est bien un string
+      const tokenString = String(newToken);
+      
+      setToken(tokenString);
+      setUser(newUser || null);
       setBloodBank(newBloodBank || null);
 
-      await SecureStore.setItemAsync('authToken', newToken);
-      API.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      // 🔥 CORRECTION : Sauvegarder comme strings
+      await SecureStore.setItemAsync('authToken', tokenString);
+      await SecureStore.setItemAsync('userType', userType);
+      API.defaults.headers.common['Authorization'] = `Bearer ${tokenString}`;
 
       showSuccessMessage('Connexion réussie !');
 
-      // Redirection selon le rôle
-      if (newUser.role === 'doctor') {
-        navigation.navigate('DoctorDashboard');
-      } else if (newUser.role === 'donor') {
-        navigation.navigate('DonorDashboard');
-      } else if (newUser.role === 'bloodbank') {
+      // Redirection selon le type d'utilisateur
+      if (userType === 'bloodbank') {
         navigation.navigate('BloodBankDashboard');
+      } else if (newUser?.role === 'doctor') {
+        navigation.navigate('DoctorDashboard');
+      } else if (newUser?.role === 'donor') {
+        navigation.navigate('DonorDashboard');
       }
 
       return { success: true };
     } catch (error: any) {
       const message = error.message || 'Erreur de connexion';
+      console.error('❌ Erreur connexion:', message);
       showErrorMessage(message);
       return { success: false, message };
     } finally {
@@ -127,18 +164,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const register = async (userData: any, navigation: any) => {
+  const register = async (userData: any, userType: 'user' | 'bloodbank', navigation: any) => {
     try {
       setLoading(true);
-      const response = await authService.register(userData);
-      const { token: newToken, user: newUser, bloodBank: newBloodBank } = response.data;
+      console.log(`📝 Tentative d'inscription ${userType}:`, userData.email);
+      
+      let response;
+      if (userType === 'bloodbank') {
+        response = await authService.registerBloodBank(userData);
+      } else {
+        response = await authService.register(userData);
+      }
 
-      setToken(newToken);
-      setUser(newUser);
+      // 🔥 CORRECTION : Extraire les données correctement
+      const responseData = response.data || response;
+      const newToken = responseData.token || responseData.data?.token;
+      const newUser = responseData.user || responseData.data?.user;
+      const newBloodBank = responseData.bloodBank || responseData.data?.bloodBank;
+
+      if (!newToken) {
+        console.error('❌ Token manquant dans la réponse:', responseData);
+        throw new Error('Token manquant dans la réponse du serveur');
+      }
+
+      // 🔥 CORRECTION : Convertir en string
+      const tokenString = String(newToken);
+      
+      setToken(tokenString);
+      setUser(newUser || null);
       setBloodBank(newBloodBank || null);
 
-      await SecureStore.setItemAsync('authToken', newToken);
-      API.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      // 🔥 CORRECTION : Sauvegarder comme strings
+      await SecureStore.setItemAsync('authToken', tokenString);
+      await SecureStore.setItemAsync('userType', userType);
+      API.defaults.headers.common['Authorization'] = `Bearer ${tokenString}`;
 
       const roleMessages: any = {
         doctor: 'Compte médecin créé ! Vous pouvez créer des alertes.',
@@ -146,20 +205,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         bloodbank: 'Compte banque de sang créé ! Vous pouvez gérer les stocks.'
       };
 
-      showSuccessMessage(roleMessages[newUser.role] || 'Compte créé avec succès!');
+      showSuccessMessage(roleMessages[newUser?.role || 'bloodbank'] || 'Compte créé avec succès!');
 
-      // Redirection selon le rôle
-      if (newUser.role === 'doctor') {
-        navigation.navigate('DoctorDashboard');
-      } else if (newUser.role === 'donor') {
-        navigation.navigate('DonorDashboard');
-      } else if (newUser.role === 'bloodbank') {
+      // Redirection
+      if (userType === 'bloodbank') {
         navigation.navigate('BloodBankDashboard');
+      } else if (newUser?.role === 'doctor') {
+        navigation.navigate('DoctorDashboard');
+      } else if (newUser?.role === 'donor') {
+        navigation.navigate('DonorDashboard');
       }
 
       return { success: true };
     } catch (error: any) {
       const message = error.message || 'Erreur lors de l\'inscription';
+      console.error('❌ Erreur inscription:', message);
+      console.error('Détails erreur:', error);
       showErrorMessage(message);
       return { success: false, message };
     } finally {
@@ -169,10 +230,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async (navigation: any) => {
     try {
+      console.log('🚪 Déconnexion...');
       setUser(null);
       setBloodBank(null);
       setToken(null);
       await SecureStore.deleteItemAsync('authToken');
+      await SecureStore.deleteItemAsync('userType');
       delete API.defaults.headers.common['Authorization'];
 
       navigation.navigate('Welcome');
@@ -190,7 +253,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     login,
     register,
     logout,
-    isAuthenticated: !!user && !!token
+    isAuthenticated: !!(user || bloodBank) && !!token
   };
 
   return (

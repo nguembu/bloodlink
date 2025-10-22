@@ -1,24 +1,24 @@
 const express = require('express');
 const {
   createAlert,
-  propagateAlert,
-  validateReception,
-  cancelAlert,
-  getBloodBankAlerts
+  notifyDonors,
+  respondToAlert,
+  getBloodBankAlerts,
+  getDoctorAlerts
 } = require('../controllers/alertController');
-const { protect, authorize } = require('../middleware/auth');
+const { protectUser, protectBloodBank, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.use(protect);
+// Médecins - protection User
+router.post('/', protectUser, authorize('doctor'), createAlert);
+router.get('/doctor', protectUser, authorize('doctor'), getDoctorAlerts);
 
-// Médecins
-router.post('/', authorize('doctor'), createAlert);
+// Banques de sang - protection BloodBank
+router.get('/bloodbank', protectBloodBank, getBloodBankAlerts);
+router.post('/notify-donors', protectBloodBank, notifyDonors);
 
-// Banques de sang
-router.get('/bloodbank', authorize('bloodbank'), getBloodBankAlerts);
-router.post('/:alertId/propagate', authorize('bloodbank'), propagateAlert);
-router.patch('/:alertId/validate', authorize('bloodbank'), validateReception);
-router.patch('/:alertId/cancel', authorize('bloodbank'), cancelAlert);
+// Donneurs - protection User
+router.post('/:alertId/respond', protectUser, authorize('donor'), respondToAlert);
 
 module.exports = router;

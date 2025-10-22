@@ -7,14 +7,9 @@ export const alertService = {
     return API.post('/alerts', alertData);
   },
 
-  getMyAlerts: (filters: any = {}) => {
+  getMyAlerts: () => {
     console.log('📥 Récupération alertes médecin');
-    return API.get('/alerts/my/alerts', { params: filters });
-  },
-
-  cancelAlert: (alertId: string) => {
-    console.log('❌ Annulation alerte:', alertId);
-    return API.patch(`/alerts/${alertId}/cancel`);
+    return API.get('/alerts/doctor');
   },
 
   // === BANQUES DE SANG ===
@@ -23,19 +18,9 @@ export const alertService = {
     return API.get('/alerts/bloodbank');
   },
 
-  propagateAlert: (alertId: string) => {
-    console.log('🔄 Propagation alerte:', alertId);
-    return API.post(`/alerts/${alertId}/propagate`);
-  },
-
-  validateReception: (alertId: string) => {
-    console.log('✅ Validation réception sang:', alertId);
-    return API.patch(`/alerts/${alertId}/validate`);
-  },
-
   notifyDonors: (alertId: string, radius: number = 10) => {
     console.log('🔔 Notification donneurs:', { alertId, radius });
-    return API.post('/donors/notify', { alertId, radius });
+    return API.post('/alerts/notify-donors', { alertId, radius });
   },
 
   // === DONNEURS ===
@@ -48,12 +33,7 @@ export const alertService = {
 
   respondToAlert: (alertId: string, responseData: any) => {
     console.log('📝 Réponse à alerte:', alertId, responseData);
-    return API.post(`/donors/alert/${alertId}/respond`, responseData);
-  },
-
-  getDonationHistory: () => {
-    console.log('📚 Historique des dons');
-    return API.get('/donors/donation-history');
+    return API.post(`/alerts/${alertId}/respond`, responseData);
   },
 
   getDonorStats: () => {

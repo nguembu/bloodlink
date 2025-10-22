@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const BloodBank = require('../models/BloodBank');
 
-const protect = async (req, res, next) => {
+const protectUser = async (req, res, next) => {
   try {
     let token;
 
@@ -36,6 +37,41 @@ const protect = async (req, res, next) => {
   }
 };
 
+const protectBloodBank = async (req, res, next) => {
+  try {
+    let token;
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Accès non autorisé. Token manquant.'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const bloodBank = await BloodBank.findById(decoded.id);
+
+    if (!bloodBank || !bloodBank.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Banque de sang non trouvée ou compte désactivé.'
+      });
+    }
+
+    req.bloodBank = bloodBank;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: 'Token invalide.'
+    });
+  }
+};
+
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
@@ -48,4 +84,4 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { protect, authorize };
+module.exports = { protectUser, protectBloodBank, authorize };

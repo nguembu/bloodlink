@@ -24,10 +24,10 @@ const sendPushNotification = async (user, alert, type, message) => {
     }
 
     // En développement, on simule l'envoi
-    console.log(`📤 Notification to ${user.email}: ${title} - ${message}`);
+    console.log(`📤 Notification to user ${user._id}: ${title} - ${message}`);
 
     // Sauvegarder la notification dans la base de données
-    await Notification.create({
+    const notification = await Notification.create({
       user: user._id,
       alert: alert ? alert._id : null,
       type,
@@ -35,12 +35,11 @@ const sendPushNotification = async (user, alert, type, message) => {
       message,
       data: {
         alertId: alert ? alert._id.toString() : null,
-        bloodType: alert ? alert.bloodType : null,
-        hospital: alert && alert.bloodBank ? alert.bloodBank.hospitalName : null
+        bloodType: alert ? alert.bloodType : null
       }
     });
 
-    return true;
+    return notification;
   } catch (error) {
     console.error('Error sending notification:', error);
     return false;
@@ -57,7 +56,11 @@ const getNotificationHistory = async (userId) => {
 
 // Marquer comme lu
 const markAsRead = async (notificationId) => {
-  return await Notification.findByIdAndUpdate(notificationId, { read: true });
+  return await Notification.findByIdAndUpdate(
+    notificationId, 
+    { read: true },
+    { new: true }
+  );
 };
 
 module.exports = {

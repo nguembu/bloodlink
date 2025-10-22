@@ -11,6 +11,11 @@ export const bloodBankService = {
     return API.get('/bloodbanks/inventory');
   },
 
+  getProfile: () => {
+    console.log('🏥 Récupération profil banque de sang');
+    return API.get('/bloodbanks/profile');
+  },
+
   findNearbyBloodBanks: (latitude: number, longitude: number, maxDistance: number = 50) => {
     console.log('📍 Banques de sang à proximité:', { latitude, longitude, maxDistance });
     return API.get('/bloodbanks/nearby', {

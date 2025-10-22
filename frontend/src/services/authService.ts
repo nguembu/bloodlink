@@ -1,15 +1,18 @@
+// services/authService.ts
 import API from './api';
 
 export const authService = {
+  // === USER (Donneur/Médecin) ===
   login: async (email: string, password: string) => {
     try {
       const response = await API.post('/auth/login', { email, password });
-      console.log('✅ Login API response:', response.data);
+      console.log('✅ Login User response:', response.data);
       
+      // 🔥 CORRECTION : Retourner les données directement
       return {
         token: response.data.token,
-        user: response.data.data.user,
-        bloodBank: response.data.data.bloodBank
+        user: response.data.data?.user,
+        bloodBank: null
       };
     } catch (error: any) {
       throw new Error(error.response?.data?.message || "Erreur de connexion");
@@ -19,7 +22,8 @@ export const authService = {
   register: async (userData: any) => {
     try {
       const response = await API.post('/auth/register', userData);
-      return response.data;
+      console.log('✅ Register User response:', response.data);
+      return response;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || "Erreur lors de l'inscription");
     }
@@ -34,25 +38,39 @@ export const authService = {
     }
   },
 
-  updateLocation: async (latitude: number, longitude: number, address: string = '') => {
+  // === BLOODBANK ===
+  loginBloodBank: async (email: string, password: string) => {
     try {
-      const response = await API.patch('/auth/location', { 
-        latitude, 
-        longitude, 
-        address 
-      });
-      return response.data;
+      const response = await API.post('/auth/bloodbank/login', { email, password });
+      console.log('✅ Login BloodBank response:', response.data);
+      
+      // 🔥 CORRECTION : Retourner les données directement
+      return {
+        token: response.data.token,
+        user: null,
+        bloodBank: response.data.data?.bloodBank
+      };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || "Impossible de mettre à jour la localisation");
+      throw new Error(error.response?.data?.message || "Erreur de connexion");
     }
   },
 
-  updateFCMToken: async (fcmToken: string) => {
+  registerBloodBank: async (bloodBankData: any) => {
     try {
-      const response = await API.patch('/auth/fcm-token', { fcmToken });
+      const response = await API.post('/auth/bloodbank/register', bloodBankData);
+      console.log('✅ Register BloodBank response:', response.data);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || "Erreur lors de l'inscription");
+    }
+  },
+
+  getBloodBankProfile: async () => {
+    try {
+      const response = await API.get('/auth/bloodbank/profile');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || "Impossible de mettre à jour le token FCM");
+      throw new Error(error.response?.data?.message || "Impossible de récupérer le profil");
     }
-  }
+  },
 };

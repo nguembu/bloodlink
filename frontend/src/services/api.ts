@@ -1,59 +1,66 @@
+// services/api.ts
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
+// 🔥 LA BONNE IP DE VOTRE PC
+const BACKEND_URL = 'http://10.2.8.135:5000';
+
+console.log('🎯 Backend URL:', BACKEND_URL);
+
 const API = axios.create({
-  baseURL: 'http://192.168.88.155:5000/api',
-  timeout: 15000,
+  baseURL: `${BACKEND_URL}/api`,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Intercepteur pour ajouter le token automatiquement
+// Logging
 API.interceptors.request.use(
-  async (config: any) => {
-    try {
-      const token = await SecureStore.getItemAsync('authToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log('✅ Token added to request:', config.url);
-      }
-    } catch (error) {
-      console.error('Error getting token from SecureStore:', error);
-    }
+  (config) => {
+    console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
-  (error: any) => {
-    console.error('Request interceptor error:', error);
+  (error) => {
+    console.error('❌ Erreur requête:', error);
     return Promise.reject(error);
   }
 );
 
-// Intercepteur pour gérer les erreurs globales
 API.interceptors.response.use(
-  (response: any) => {
-    console.log('✅ API Response:', response.status, response.config.url);
+  (response) => {
+    console.log(`📥 ${response.status} ${response.config.url}`);
     return response;
   },
-  async (error: any) => {
-    console.error('❌ API Error:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.response?.data?.message || error.message
-    });
-    
-    if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync('authToken');
-      Alert.alert('Session expirée', 'Votre session a expiré. Veuillez vous reconnecter.');
+  (error) => {
+    console.error('❌ Erreur API:', error.message);
+
+    if (error.code === 'ERR_NETWORK') {
+      Alert.alert(
+        'Connexion Impossible',
+        `URL: ${BACKEND_URL}\n\n` +
+        `Vérifiez que:\n` +
+        `• Votre téléphone est sur le MÊME réseau\n` +
+        `• Le firewall autorise le port 5000\n` +
+        `• Le serveur backend est démarré`
+      );
     }
-    
-    if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
-      Alert.alert('Erreur de connexion', 'Impossible de se connecter au serveur.');
-    }
-    
+
     return Promise.reject(error);
   }
 );
+
+export const testConnection = async () => {
+  try {
+    console.log('🧪 Test connexion...');
+    const response = await API.get('/health');
+    console.log('✅ Backend accessible!');
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.log('❌ Backend inaccessible:', error.message);
+    return { success: false, error: error.message };
+  }
+};
 
 export default API;

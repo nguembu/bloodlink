@@ -1,25 +1,24 @@
 const BloodBank = require('../models/BloodBank');
-const User = require('../models/User');
+const bcrypt = require('bcryptjs');
 
 // Mettre à jour l'inventaire de sang
 exports.updateInventory = async (req, res) => {
   try {
     const { bloodType, quantity } = req.body;
 
-    const bloodBank = await BloodBank.findOne({ user: req.user.id });
-    if (!bloodBank) {
-      return res.status(403).json({
+    if (!bloodType || quantity === undefined) {
+      return res.status(400).json({
         success: false,
-        message: 'Accès réservé aux banques de sang.'
+        message: 'Type de sang et quantité requis.'
       });
     }
 
-    await bloodBank.updateInventory(bloodType, quantity);
+    await req.bloodBank.updateInventory(bloodType, quantity);
 
     res.json({
       success: true,
       message: 'Inventaire mis à jour avec succès.',
-      data: { bloodBank }
+      data: { bloodBank: req.bloodBank }
     });
 
   } catch (error) {
@@ -33,22 +32,14 @@ exports.updateInventory = async (req, res) => {
 // Obtenir l'inventaire
 exports.getInventory = async (req, res) => {
   try {
-    const bloodBank = await BloodBank.findOne({ user: req.user.id });
-    if (!bloodBank) {
-      return res.status(403).json({
-        success: false,
-        message: 'Accès réservé aux banques de sang.'
-      });
-    }
-
     res.json({
       success: true,
       data: {
-        inventory: bloodBank.bloodInventory,
+        inventory: req.bloodBank.bloodInventory,
         bloodBank: {
-          hospitalName: bloodBank.hospitalName,
-          address: bloodBank.address,
-          phone: bloodBank.phone
+          hospitalName: req.bloodBank.hospitalName,
+          address: req.bloodBank.address,
+          phone: req.bloodBank.phone
         }
       }
     });
@@ -61,10 +52,35 @@ exports.getInventory = async (req, res) => {
   }
 };
 
-// Trouver les banques de sang à proximité
+// Obtenir le profil de la bloodbank
+exports.getBloodBankProfile = async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: {
+        bloodBank: req.bloodBank
+      }
+    });
+
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Trouver les banques de sang à proximité (publique)
 exports.findNearbyBloodBanks = async (req, res) => {
   try {
     const { latitude, longitude, maxDistance = 50 } = req.query;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude et longitude requises.'
+      });
+    }
 
     const bloodBanks = await BloodBank.find({
       location: {
@@ -77,9 +93,7 @@ exports.findNearbyBloodBanks = async (req, res) => {
         }
       },
       isActive: true
-    })
-    .populate('user', 'name phone')
-    .select('-bloodInventory');
+    }).select('-password'); // Exclure le mot de passe
 
     res.json({
       success: true,

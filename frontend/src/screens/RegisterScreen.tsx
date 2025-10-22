@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Title, Card, RadioButton, Text, HelperText } from 'react-native-paper';
+import { TextInput, Button, Title, Card, RadioButton, Text, HelperText, SegmentedButtons } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 
 export default function RegisterScreen({ navigation, route }: any) {
@@ -19,6 +19,7 @@ export default function RegisterScreen({ navigation, route }: any) {
     licenseNumber: ''
   });
   
+  const [userType, setUserType] = useState<'user' | 'bloodbank'>('user');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const { register, loading } = useAuth();
@@ -51,19 +52,20 @@ export default function RegisterScreen({ navigation, route }: any) {
       newErrors.confirmPassword = 'Les mots de passe ne correspondent pas';
     }
 
-    if (formData.role === 'donor') {
-      if (!formData.name) newErrors.name = 'Le nom est requis pour les donneurs';
-      if (!formData.bloodType) newErrors.bloodType = 'Le type sanguin est requis';
-    }
+    if (userType === 'user') {
+      if (formData.role === 'donor') {
+        if (!formData.name) newErrors.name = 'Le nom est requis pour les donneurs';
+        if (!formData.bloodType) newErrors.bloodType = 'Le type sanguin est requis';
+      }
 
-    if (formData.role === 'doctor') {
-      if (!formData.name) newErrors.name = 'Le nom est requis pour les médecins';
-      if (!formData.hospital) newErrors.hospital = 'Le nom de l\'hôpital est requis';
-      if (!formData.cni) newErrors.cni = 'Le numéro CNI est requis';
-      if (!formData.licenseNumber) newErrors.licenseNumber = 'Le numéro de licence est requis';
-    }
-
-    if (formData.role === 'bloodbank') {
+      if (formData.role === 'doctor') {
+        if (!formData.name) newErrors.name = 'Le nom est requis pour les médecins';
+        if (!formData.hospital) newErrors.hospital = 'Le nom de l\'hôpital est requis';
+        if (!formData.cni) newErrors.cni = 'Le numéro CNI est requis';
+        if (!formData.licenseNumber) newErrors.licenseNumber = 'Le numéro de licence est requis';
+      }
+    } else {
+      // BloodBank validation
       if (!formData.hospitalName) newErrors.hospitalName = 'Le nom de l\'hôpital est requis';
       if (!formData.address) newErrors.address = 'L\'adresse est requise';
     }
@@ -78,7 +80,7 @@ export default function RegisterScreen({ navigation, route }: any) {
     const userData = { ...formData };
     delete userData.confirmPassword;
 
-    await register(userData, navigation);
+    await register(userData, userType, navigation);
   };
 
   return (
@@ -97,29 +99,51 @@ export default function RegisterScreen({ navigation, route }: any) {
               </Text>
             </View>
 
-            {/* Sélection du rôle */}
+            {/* Sélection du type de compte */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Je suis :</Text>
-              <RadioButton.Group
-                value={formData.role}
-                onValueChange={value => handleChange('role', value)}
-              >
-                <View style={styles.radioContainer}>
-                  <View style={styles.radioItem}>
-                    <RadioButton value="donor" color="#2563eb" />
-                    <Text style={styles.radioLabel}>Donneur</Text>
-                  </View>
-                  <View style={styles.radioItem}>
-                    <RadioButton value="doctor" color="#dc2626" />
-                    <Text style={styles.radioLabel}>Médecin</Text>
-                  </View>
-                  <View style={styles.radioItem}>
-                    <RadioButton value="bloodbank" color="#059669" />
-                    <Text style={styles.radioLabel}>Banque de Sang</Text>
-                  </View>
-                </View>
-              </RadioButton.Group>
+              <Text style={styles.sectionTitle}>Type de compte :</Text>
+              <SegmentedButtons
+                value={userType}
+                onValueChange={setUserType}
+                buttons={[
+                  {
+                    value: 'user',
+                    label: 'Utilisateur',
+                    icon: 'account',
+                    style: userType === 'user' ? styles.selectedSegment : {}
+                  },
+                  {
+                    value: 'bloodbank',
+                    label: 'Banque de Sang',
+                    icon: 'hospital',
+                    style: userType === 'bloodbank' ? styles.selectedSegment : {}
+                  },
+                ]}
+                style={styles.segmentedButtons}
+              />
             </View>
+
+            {/* Sélection du rôle (seulement pour User) */}
+            {userType === 'user' && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Je suis :</Text>
+                <RadioButton.Group
+                  value={formData.role}
+                  onValueChange={value => handleChange('role', value)}
+                >
+                  <View style={styles.radioContainer}>
+                    <View style={styles.radioItem}>
+                      <RadioButton value="donor" color="#2563eb" />
+                      <Text style={styles.radioLabel}>Donneur</Text>
+                    </View>
+                    <View style={styles.radioItem}>
+                      <RadioButton value="doctor" color="#dc2626" />
+                      <Text style={styles.radioLabel}>Médecin</Text>
+                    </View>
+                  </View>
+                </RadioButton.Group>
+              </View>
+            )}
 
             {/* Informations de base */}
             <View style={styles.section}>
@@ -180,7 +204,7 @@ export default function RegisterScreen({ navigation, route }: any) {
             </View>
 
             {/* Champs spécifiques aux donneurs */}
-            {formData.role === 'donor' && (
+            {userType === 'user' && formData.role === 'donor' && (
               <View style={styles.section}>
                 <TextInput
                   label="Nom complet"
@@ -224,7 +248,7 @@ export default function RegisterScreen({ navigation, route }: any) {
             )}
 
             {/* Champs spécifiques aux médecins */}
-            {formData.role === 'doctor' && (
+            {userType === 'user' && formData.role === 'doctor' && (
               <View style={styles.section}>
                 <TextInput
                   label="Nom complet"
@@ -289,7 +313,7 @@ export default function RegisterScreen({ navigation, route }: any) {
             )}
 
             {/* Champs spécifiques aux banques de sang */}
-            {formData.role === 'bloodbank' && (
+            {userType === 'bloodbank' && (
               <View style={styles.section}>
                 <TextInput
                   label="Nom de l'hôpital"
@@ -347,16 +371,16 @@ export default function RegisterScreen({ navigation, route }: any) {
               disabled={loading}
               style={[
                 styles.registerButton,
-                formData.role === 'donor' && styles.donorButton,
-                formData.role === 'doctor' && styles.doctorButton,
-                formData.role === 'bloodbank' && styles.bloodbankButton
+                userType === 'bloodbank' ? styles.bloodbankButton : 
+                formData.role === 'donor' ? styles.donorButton : 
+                styles.doctorButton
               ]}
               labelStyle={styles.registerButtonLabel}
               contentStyle={styles.buttonContent}
             >
-              {formData.role === 'donor' && 'Devenir Donneur'}
-              {formData.role === 'doctor' && 'Créer Compte Médecin'}
-              {formData.role === 'bloodbank' && 'Créer Compte Banque de Sang'}
+              {userType === 'bloodbank' && 'Créer Compte Banque de Sang'}
+              {userType === 'user' && formData.role === 'donor' && 'Devenir Donneur'}
+              {userType === 'user' && formData.role === 'doctor' && 'Créer Compte Médecin'}
             </Button>
 
             <View style={styles.loginSection}>
@@ -376,6 +400,8 @@ export default function RegisterScreen({ navigation, route }: any) {
     </KeyboardAvoidingView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {

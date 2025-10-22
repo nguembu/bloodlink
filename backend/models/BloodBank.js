@@ -1,11 +1,7 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const bloodBankSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
   hospitalName: {
     type: String,
     required: true,
@@ -19,7 +15,8 @@ const bloodBankSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number],
-      required: true
+      required: false,
+      default: [0, 0]
     }
   },
   address: {
@@ -27,6 +24,15 @@ const bloodBankSchema = new mongoose.Schema({
     required: true
   },
   phone: {
+    type: String,
+    required: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  password: {
     type: String,
     required: true
   },
@@ -49,6 +55,13 @@ const bloodBankSchema = new mongoose.Schema({
 });
 
 bloodBankSchema.index({ location: '2dsphere' });
+
+// Middleware de hachage du mot de passe
+bloodBankSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
 
 // Méthode pour vérifier la disponibilité du sang
 bloodBankSchema.methods.hasBloodAvailable = function(bloodType, quantity = 1) {
