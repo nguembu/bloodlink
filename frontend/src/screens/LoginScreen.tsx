@@ -1,14 +1,18 @@
+// screens/LoginScreen.tsx
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Title, Card, Text, SegmentedButtons } from 'react-native-paper';
-import { useAuth } from '../context/AuthContext';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { TextInput, Button, Text, Card, SegmentedButtons, useTheme } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation, route }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [userType, setUserType] = useState<'user' | 'bloodbank'>('user');
-  const { login, loading } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const theme = useTheme();
 
   const role = route.params?.role;
 
@@ -18,112 +22,183 @@ export default function LoginScreen({ navigation, route }: any) {
       return;
     }
 
-    await login(email, password, userType, navigation);
+    setLoading(true);
+    // Simuler une connexion
+    setTimeout(() => {
+      setLoading(false);
+      alert('Fonction de connexion à implémenter');
+    }, 1500);
+  };
+
+  const getButtonColor = () => {
+    return userType === 'bloodbank' ? '#059669' : '#d32f2f';
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.header}>
-              <Text style={styles.headerIcon}>🔐</Text>
-              <Title style={styles.title}>
-                Connexion
-              </Title>
-              <Text style={styles.subtitle}>
-                Accédez à votre compte BloodLink
-              </Text>
-            </View>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#d32f2f', '#f44336']}
+        style={styles.gradientHeader}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerIcon}>🔐</Text>
+          <Text style={styles.headerTitle}>
+            Connexion {role ? `- ${role === 'doctor' ? 'Médecin' : role === 'donor' ? 'Donneur' : 'Banque de Sang'}` : ''}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            Accédez à votre espace sécurisé
+          </Text>
+        </View>
+      </LinearGradient>
 
-            {/* Sélection du type d'utilisateur */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Type de compte :</Text>
-              <SegmentedButtons
-                value={userType}
-                onValueChange={setUserType}
-                buttons={[
-                  {
-                    value: 'user',
-                    label: 'Utilisateur',
-                    icon: 'account',
-                    style: userType === 'user' ? styles.selectedSegment : {}
-                  },
-                  {
-                    value: 'bloodbank',
-                    label: 'Banque de Sang',
-                    icon: 'hospital',
-                    style: userType === 'bloodbank' ? styles.selectedSegment : {}
-                  },
-                ]}
-                style={styles.segmentedButtons}
-              />
-            </View>
-            
-            <TextInput
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              mode="outlined"
-              style={styles.input}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              left={<TextInput.Icon icon="email" />}
-              outlineColor="#e5e7eb"
-              activeOutlineColor="#dc2626"
-            />
-            
-            <TextInput
-              label="Mot de passe"
-              value={password}
-              onChangeText={setPassword}
-              mode="outlined"
-              style={styles.input}
-              secureTextEntry={!showPassword}
-              left={<TextInput.Icon icon="lock" />}
-              right={
-                <TextInput.Icon 
-                  icon={showPassword ? "eye-off" : "eye"} 
-                  onPress={() => setShowPassword(!showPassword)}
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card style={styles.loginCard} elevation={4}>
+            <Card.Content>
+              {/* Type de compte */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Type de compte</Text>
+                <SegmentedButtons
+                  value={userType}
+                  onValueChange={setUserType}
+                  buttons={[
+                    {
+                      value: 'user',
+                      label: '👤 Utilisateur',
+                      style: userType === 'user' ? styles.selectedSegment : {},
+                      checkedColor: '#d32f2f',
+                    },
+                    {
+                      value: 'bloodbank',
+                      label: '🏥 Banque de Sang',
+                      style: userType === 'bloodbank' ? styles.selectedSegment : {},
+                      checkedColor: '#059669',
+                    },
+                  ]}
+                  style={styles.segmentedButtons}
                 />
-              }
-              outlineColor="#e5e7eb"
-              activeOutlineColor="#dc2626"
-            />
-            
-            <Button 
-              mode="contained" 
-              onPress={handleLogin}
-              loading={loading}
-              disabled={loading}
-              style={[
-                styles.loginButton,
-                userType === 'bloodbank' ? styles.bloodbankButton : styles.userButton
-              ]}
-              labelStyle={styles.buttonLabel}
-              contentStyle={styles.buttonContent}
-            >
-              {userType === 'bloodbank' ? 'Connexion Banque de Sang' : 'Se connecter'}
-            </Button>
+              </View>
 
-            <View style={styles.registerSection}>
-              <Text style={styles.registerText}>Pas de compte ?</Text>
-              <Button 
-                mode="text" 
-                onPress={() => navigation.navigate('Register')}
-                style={styles.registerButton}
-                labelStyle={styles.registerButtonLabel}
-              >
-                S'inscrire
-              </Button>
+              {/* Formulaire */}
+              <View style={styles.formSection}>
+                <TextInput
+                  label="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  mode="outlined"
+                  style={styles.input}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  left={<TextInput.Icon icon="email" color="#6b7280" />}
+                  outlineColor="#e5e7eb"
+                  activeOutlineColor={getButtonColor()}
+                  theme={{ roundness: 12 }}
+                />
+                
+                <TextInput
+                  label="Mot de passe"
+                  value={password}
+                  onChangeText={setPassword}
+                  mode="outlined"
+                  style={styles.input}
+                  secureTextEntry={!showPassword}
+                  left={<TextInput.Icon icon="lock" color="#6b7280" />}
+                  right={
+                    <TextInput.Icon 
+                      icon={showPassword ? "eye-off" : "eye"} 
+                      onPress={() => setShowPassword(!showPassword)}
+                      color="#6b7280"
+                    />
+                  }
+                  outlineColor="#e5e7eb"
+                  activeOutlineColor={getButtonColor()}
+                  theme={{ roundness: 12 }}
+                />
+
+                <Button 
+                  mode="contained" 
+                  onPress={handleLogin}
+                  loading={loading}
+                  disabled={loading}
+                  style={[styles.loginButton, { backgroundColor: getButtonColor() }]}
+                  labelStyle={styles.loginButtonLabel}
+                  contentStyle={styles.loginButtonContent}
+                >
+                  {userType === 'bloodbank' ? 'Connexion Banque de Sang' : 'Se connecter'}
+                </Button>
+
+                <Button 
+                  mode="text" 
+                  onPress={() => {}}
+                  style={styles.forgotPassword}
+                  labelStyle={styles.forgotPasswordLabel}
+                >
+                  Mot de passe oublié ?
+                </Button>
+              </View>
+
+              {/* Séparateur */}
+              <View style={styles.separatorContainer}>
+                <View style={styles.separatorLine} />
+                <Text style={styles.separatorText}>ou</Text>
+                <View style={styles.separatorLine} />
+              </View>
+
+              {/* Inscription */}
+              <View style={styles.registerSection}>
+                <Text style={styles.registerText}>Pas encore de compte ?</Text>
+                <Button 
+                  mode="outlined" 
+                  onPress={() => navigation.navigate('Register')}
+                  style={styles.registerButton}
+                  labelStyle={styles.registerButtonLabel}
+                  contentStyle={styles.registerButtonContent}
+                >
+                  Créer un compte
+                </Button>
+              </View>
+
+              {/* Info sécurité */}
+              <View style={styles.securityInfo}>
+                <Text style={styles.securityIcon}>🔒</Text>
+                <Text style={styles.securityText}>
+                  Vos données sont sécurisées et confidentielles
+                </Text>
+              </View>
+            </Card.Content>
+          </Card>
+
+          {/* Features */}
+          <View style={styles.featuresContainer}>
+            <Text style={styles.featuresTitle}>Pourquoi nous choisir ?</Text>
+            <View style={styles.featuresGrid}>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>🛡️</Text>
+                <Text style={styles.featureTitle}>Sécurisé</Text>
+                <Text style={styles.featureDesc}>Données cryptées</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>⚡</Text>
+                <Text style={styles.featureTitle}>Rapide</Text>
+                <Text style={styles.featureDesc}>Alertes instantanées</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>❤️</Text>
+                <Text style={styles.featureTitle}>Impact</Text>
+                <Text style={styles.featureDesc}>Vies sauvées</Text>
+              </View>
             </View>
-          </Card.Content>
-        </Card>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -132,96 +207,179 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  card: {
-    borderRadius: 16,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+  gradientHeader: {
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 30,
   },
   headerIcon: {
-    fontSize: 40,
+    fontSize: 48,
     marginBottom: 16,
   },
-  title: {
-    textAlign: 'center',
+  headerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1f2937',
+    color: '#ffffff',
+    textAlign: 'center',
     marginBottom: 8,
   },
-  subtitle: {
-    textAlign: 'center',
+  headerSubtitle: {
     fontSize: 16,
-    color: '#6b7280',
-    lineHeight: 22,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
   },
-  section: {
+  keyboardAvoid: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  loginCard: {
+    borderRadius: 24,
     marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 14,
+  section: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 12,
   },
   segmentedButtons: {
-    marginBottom: 8,
+    borderRadius: 12,
   },
   selectedSegment: {
-    backgroundColor: '#dc2626',
+    backgroundColor: 'rgba(211, 47, 47, 0.1)',
+  },
+  formSection: {
+    marginBottom: 24,
   },
   input: {
     marginBottom: 16,
     backgroundColor: '#ffffff',
   },
   loginButton: {
-    marginTop: 10,
-    borderRadius: 12,
+    borderRadius: 16,
+    marginTop: 8,
+    elevation: 2,
   },
-  userButton: {
-    backgroundColor: '#2563eb',
-  },
-  bloodbankButton: {
-    backgroundColor: '#059669',
-  },
-  buttonLabel: {
+  loginButtonLabel: {
     fontSize: 16,
     fontWeight: '600',
+    letterSpacing: 0.5,
   },
-  buttonContent: {
-    height: 48,
+  loginButtonContent: {
+    height: 52,
+  },
+  forgotPassword: {
+    marginTop: 16,
+  },
+  forgotPasswordLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  separatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  separatorText: {
+    marginHorizontal: 16,
+    color: '#9ca3af',
+    fontWeight: '500',
   },
   registerSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  registerText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 16,
+  },
+  registerButton: {
+    borderColor: '#d32f2f',
+    borderWidth: 1,
+    borderRadius: 16,
+  },
+  registerButtonLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#d32f2f',
+  },
+  registerButtonContent: {
+    height: 48,
+  },
+  securityInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    backgroundColor: '#f0fdf4',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#059669',
   },
-  registerText: {
-    fontSize: 15,
-    color: '#6b7280',
+  securityIcon: {
     marginRight: 8,
   },
-  registerButton: {
-    marginLeft: -8,
+  securityText: {
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '500',
   },
-  registerButtonLabel: {
-    fontSize: 15,
+  featuresContainer: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 20,
+    elevation: 2,
+  },
+  featuresTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#dc2626',
-  }
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  featuresGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  featureItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  featureIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  featureTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  featureDesc: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
 });
